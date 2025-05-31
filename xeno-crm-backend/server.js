@@ -93,19 +93,20 @@ app.get('/api/cors-test', (req, res) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// CORS proxy middleware - simple implementation
+// CORS proxy middleware - simple implementation without path-to-regexp issues
 import fetch from 'node-fetch';
 
-// Create a simpler CORS proxy route
-app.get('/proxy/:proxyUrl(*)', async (req, res) => {
+// Create a simpler CORS proxy route without complex patterns
+app.get('/proxy', async (req, res) => {
   try {
-    // Get the URL to proxy from request parameters
-    const proxyUrl = req.params.proxyUrl;
-    console.log(`CORS Proxy request for: ${proxyUrl}`);
+    // Get the URL from query parameter instead of path parameter
+    const targetUrl = req.query.url;
     
-    if (!proxyUrl) {
-      return res.status(400).json({ error: 'Missing URL parameter' });
+    if (!targetUrl) {
+      return res.status(400).json({ error: 'Missing URL parameter. Use ?url=https://example.com' });
     }
+    
+    console.log(`CORS Proxy request for: ${targetUrl}`);
     
     // Forward all headers except host and connection
     const headers = {};
@@ -116,7 +117,7 @@ app.get('/proxy/:proxyUrl(*)', async (req, res) => {
     }
     
     // Make the request to the target URL
-    const response = await fetch(proxyUrl, {
+    const response = await fetch(targetUrl, {
       method: 'GET', // For now, only support GET
       headers
     });
@@ -148,7 +149,7 @@ app.get('/proxy/:proxyUrl(*)', async (req, res) => {
 });
 
 // Handle OPTIONS preflight for the proxy
-app.options('/proxy/:proxyUrl(*)', (req, res) => {
+app.options('/proxy', (req, res) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
