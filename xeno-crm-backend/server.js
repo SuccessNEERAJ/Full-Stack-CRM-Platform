@@ -1,6 +1,7 @@
 // server.js
 import express from 'express';
 import session from 'express-session';
+import MongoStore from 'connect-mongo';
 import passport from 'passport';
 import dotenv from 'dotenv';
 import cors from 'cors';
@@ -36,16 +37,31 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Session configuration
+// Session configuration with MongoDB store for production
 app.use(session({
   secret: process.env.SESSION_SECRET || 'xenocrmsecret',
   resave: false,
   saveUninitialized: false,
+  store: process.env.NODE_ENV === 'production'
+    ? MongoStore.create({
+        mongoUrl: process.env.MONGO_URI,
+        ttl: 24 * 60 * 60, // 1 day in seconds
+        autoRemove: 'native',
+        touchAfter: 24 * 3600 // time period in seconds between session updates
+      })
+    : null, // Use default memory store in development
   cookie: {
     secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
-    maxAge: 24 * 60 * 60 * 1000 // 1 day
+    maxAge: 24 * 60 * 60 * 1000, // 1 day
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' // Required for cross-site cookies
   }
 }));
+
+// Log session configuration
+console.log(`Session configuration: ${process.env.NODE_ENV === 'production' ? 'MongoDB Store' : 'Memory Store'}`);
+console.log(`Cookie secure: ${process.env.NODE_ENV === 'production'}`);
+console.log(`Cookie sameSite: ${process.env.NODE_ENV === 'production' ? 'none' : 'lax'}`);
+
 
 // Initialize Passport middleware
 app.use(passport.initialize());
