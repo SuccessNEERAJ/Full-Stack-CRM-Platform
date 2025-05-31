@@ -37,8 +37,15 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Add pre-flight OPTIONS handling for all routes (needed for CORS with credentials)
-app.options('*', cors());
+// Enable pre-flight requests for all routes
+// Handle OPTIONS requests properly without the wildcard syntax that causes errors
+app.options('/*', function(req, res) {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.sendStatus(200);
+});
 
 // Body parser middleware
 app.use(express.json());
