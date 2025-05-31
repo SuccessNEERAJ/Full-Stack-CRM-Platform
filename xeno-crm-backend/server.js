@@ -27,25 +27,28 @@ import './config/passport.js';
 
 const app = express();
 
-// Setup CORS with credentials support - explicitly support the Vercel frontend
-app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://full-stack-crm-platform.vercel.app', 'https://xeno-crm.vercel.app'] 
-    : 'http://localhost:3000',
+// Create a simple CORS options object with production domains or localhost
+const corsOptions = {
+  origin: function(origin, callback) {
+    const allowedOrigins = process.env.NODE_ENV === 'production'
+      ? ['https://full-stack-crm-platform.vercel.app', 'https://xeno-crm.vercel.app']
+      : ['http://localhost:3000'];
+      
+    // Allow requests with no origin (like mobile apps, curl, etc)
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(null, false);
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
 
-// Enable pre-flight requests for all routes
-// Handle OPTIONS requests properly without the wildcard syntax that causes errors
-app.options('/*', function(req, res) {
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.sendStatus(200);
-});
+// Apply CORS middleware with our options
+app.use(cors(corsOptions));
 
 // Body parser middleware
 app.use(express.json());
