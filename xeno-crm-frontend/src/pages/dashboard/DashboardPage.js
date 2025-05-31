@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import apiService from '../../services/apiService';
 
 // MUI components
@@ -43,8 +43,10 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 
 const DashboardPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const theme = useTheme();
   const [loading, setLoading] = useState(true);
+  const [authProcessing, setAuthProcessing] = useState(false);
   const [stats, setStats] = useState({
     totalCustomers: 0,
     totalSegments: 0,
@@ -276,6 +278,32 @@ const DashboardPage = () => {
     navigate(`/campaigns/${campaignId}`);
   };
 
+  // Handle auth redirect and session establishment
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('auth') === 'success') {
+      console.log('Auth success detected. Establishing session...');
+      setAuthProcessing(true);
+      
+      // Force an immediate API call to establish session cookie
+      apiService.get('/api/auth/current_user')
+        .then(response => {
+          console.log('Session established:', response.data);
+          
+          // Clear the URL parameters to prevent re-processing on refresh
+          // but keep the user on the dashboard page
+          navigate('/dashboard', { replace: true });
+          
+          // Update auth processing state
+          setAuthProcessing(false);
+        })
+        .catch(err => {
+          console.error('Error establishing session:', err);
+          setAuthProcessing(false);
+        });
+    }
+  }, [location, navigate]);
+  
   // Load data when component mounts
   useEffect(() => {
     // No animation code needed
