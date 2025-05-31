@@ -32,7 +32,9 @@ router.get('/google/callback',
       res.header('Cache-Control', 'no-cache, no-store, must-revalidate');
       
       // Add session ID as query parameter for debugging
-      const redirectUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard?auth=success&sid=${req.session.id}&t=${Date.now()}`;
+      // Ensure we don't have double slashes in the URL
+      const baseUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+      const redirectUrl = `${baseUrl}/dashboard?auth=success&sid=${req.session.id}&t=${Date.now()}`;
       console.log('Redirecting to:', redirectUrl);
       
       // Redirect to frontend
@@ -45,19 +47,24 @@ router.get('/google/callback',
 // @desc    Get current user
 // @access  Private
 router.get('/current_user', (req, res) => {
-  // Debug headers for CORS troubleshooting
+  // Debug headers and session info
   console.log('Current user request headers:', {
     origin: req.headers.origin,
     referer: req.headers.referer,
     cookie: req.headers.cookie ? 'Present' : 'Absent'
   });
   
-  // Debug session
-  console.log('Session exists:', !!req.session);
+  console.log('Session ID in current_user:', req.session.id || 'no session id');
+  console.log('Session exists:', req.session ? 'true' : 'false');
   console.log('User in session:', req.user ? req.user.email : 'No user');
   
-  // Set additional headers to ensure CORS works properly
+  // Explicitly force the session cookie to be sent again with the response
+  req.session.touch();
+  
+  // Set cache control headers to prevent caching
   res.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.header('Pragma', 'no-cache');
+  res.header('Expires', '0');
   
   if (req.user) {
     // User is authenticated
@@ -69,6 +76,7 @@ router.get('/current_user', (req, res) => {
         email: req.user.email,
         profileImage: req.user.profileImage
       },
+      sessionId: req.session.id,
       timestamp: new Date().toISOString()
     });
   } else {
@@ -76,6 +84,7 @@ router.get('/current_user', (req, res) => {
     res.json({ 
       isAuthenticated: false,
       message: 'No user session found',
+      sessionId: req.session.id,
       timestamp: new Date().toISOString()
     });
   }

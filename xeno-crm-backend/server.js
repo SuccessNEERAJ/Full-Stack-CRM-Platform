@@ -27,15 +27,21 @@ import './config/passport.js';
 
 const app = express();
 
-// Super simple CORS setup - allow ANY origin (for debugging only)
-app.use((req, res, next) => {
-  // Set CORS headers - allow ALL origins (temporary debugging solution)
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, Expires');
-  res.header('Access-Control-Max-Age', '86400'); // Cache preflight request for 24 hours
+// Super simple CORS setup - Extremely permissive CORS for debugging
+app.use(cors({
+  origin: true, // Allow any origin
+  credentials: true, // Critical for cookies
+  exposedHeaders: ['Set-Cookie'],
+  allowedHeaders: [
+    'Content-Type', 'Authorization', 'X-Requested-With',
+    'Origin', 'Accept', 'Cache-Control', 'X-PINGOTHER'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  maxAge: 86400 // 24 hours in seconds
+}));
 
+// Custom middleware for logging and OPTIONS handling
+app.use((req, res, next) => {
   // Log ALL requests for debugging
   console.log(`CORS REQUEST: ${req.method} ${req.url} from ${req.headers.origin || 'unknown origin'}`);
   
