@@ -27,32 +27,20 @@ import './config/passport.js';
 
 const app = express();
 
-// Temporarily allow all origins to debug CORS issues
+// Simple CORS configuration based on Stack Overflow solution
+app.use(cors({
+  origin: "https://full-stack-crm-platform.vercel.app",
+  credentials: true
+}));
+
+// Handle preflight requests
+app.options('*', cors());
+
+// Log all requests for debugging
 app.use((req, res, next) => {
-  // Log all incoming requests for debugging
   console.log(`Request from origin: ${req.headers.origin} to ${req.method} ${req.url}`);
-  
-  // Set CORS headers
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  
   next();
 });
-
-// Still include the cors middleware for additional handling
-app.use(cors({
-  origin: true, // Reflect the request origin
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
-}));
 
 // Body parser middleware
 app.use(express.json());
