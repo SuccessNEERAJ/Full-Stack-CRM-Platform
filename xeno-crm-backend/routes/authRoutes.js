@@ -30,12 +30,18 @@ router.get('/google/callback',
       
       // Set additional headers for CORS and cache control
       res.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'http://localhost:3000');
+      res.header('Access-Control-Allow-Credentials', 'true');
       
       // Add session ID as query parameter for debugging
       // Ensure we don't have double slashes in the URL
       const baseUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+      
+      // Add more debug info to the redirect URL
       const redirectUrl = `${baseUrl}/dashboard?auth=success&sid=${req.session.id}&t=${Date.now()}`;
       console.log('Redirecting to:', redirectUrl);
+      console.log('Session cookie set:', !!req.session);
+      console.log('User in session:', req.user ? req.user.email : 'No user');
       
       // Redirect to frontend
       res.redirect(redirectUrl);
