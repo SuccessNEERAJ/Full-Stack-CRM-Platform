@@ -27,11 +27,18 @@ import './config/passport.js';
 
 const app = express();
 
-// Setup CORS with credentials support
+// Setup CORS with credentials support - explicitly support the Vercel frontend
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://full-stack-crm-platform.vercel.app', 'https://xeno-crm.vercel.app'] 
+    : 'http://localhost:3000',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Add pre-flight OPTIONS handling for all routes (needed for CORS with credentials)
+app.options('*', cors());
 
 // Body parser middleware
 app.use(express.json());
@@ -41,7 +48,8 @@ app.use(express.urlencoded({ extended: false }));
 app.use(session({
   secret: process.env.SESSION_SECRET || 'xenocrmsecret',
   resave: false,
-  saveUninitialized: false,
+  saveUninitialized: true, // Changed to true to ensure cookie is always sent
+  proxy: true, // Trust the reverse proxy for HTTPS
   store: process.env.NODE_ENV === 'production'
     ? MongoStore.create({
         mongoUrl: process.env.MONGO_URI,
@@ -53,7 +61,10 @@ app.use(session({
   cookie: {
     secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
     maxAge: 24 * 60 * 60 * 1000, // 1 day
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' // Required for cross-site cookies
+    sameSite: 'none', // Always use 'none' for cross-site
+    httpOnly: true, // Prevent client-side JS from reading the cookie
+    path: '/', // Ensure cookie is available for all paths
+    domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined // Specify domain in production
   }
 }));
 
