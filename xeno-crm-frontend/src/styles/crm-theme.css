@@ -1,0 +1,319 @@
+/* CRM Theme Styles */
+:root {
+  --primary-color: #4f46e5;
+  --primary-hover: #4338ca;
+  --secondary-color: #0ea5e9;
+  --secondary-hover: #0284c7;
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --danger-color: #ef4444;
+  --info-color: #6366f1;
+  --background-light: #f9fafb;
+  --background-dark: #1e293b;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --border-color: #e2e8f0;
+  --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --header-height: 64px;
+  --sidebar-width: 260px;
+  --border-radius: 8px;
+  --transition-speed: 0.2s;
+}
+
+/* Global Styles */
+body {
+  background-color: var(--background-light);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+/* Layout */
+.crm-container {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.crm-page-header {
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.crm-page-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.crm-page-title i {
+  color: var(--primary-color);
+}
+
+/* Cards */
+.crm-card {
+  background: white;
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-shadow);
+  transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+  overflow: hidden;
+}
+
+.crm-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.crm-card-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.crm-card-title {
+  font-weight: 600;
+  font-size: 1.125rem;
+  color: var(--text-primary);
+}
+
+.crm-card-content {
+  padding: 1.5rem;
+}
+
+/* Tables */
+.crm-table-container {
+  overflow-x: auto;
+}
+
+.crm-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.crm-table th {
+  background-color: var(--background-light);
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.875rem;
+}
+
+.crm-table td {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+
+.crm-table tr:last-child td {
+  border-bottom: none;
+}
+
+.crm-table tr:hover td {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Stats Cards */
+.crm-stat-card {
+  display: flex;
+  align-items: center;
+  padding: 1.5rem;
+}
+
+.crm-stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  margin-right: 1rem;
+  flex-shrink: 0;
+}
+
+.crm-stat-content {
+  flex-grow: 1;
+}
+
+.crm-stat-label {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+
+.crm-stat-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Buttons */
+.crm-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--border-radius);
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  transition: all var(--transition-speed);
+  cursor: pointer;
+  gap: 0.5rem;
+}
+
+.crm-button-primary {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.crm-button-primary:hover {
+  background-color: var(--primary-hover);
+}
+
+.crm-button-secondary {
+  background-color: var(--secondary-color);
+  color: white;
+}
+
+.crm-button-secondary:hover {
+  background-color: var(--secondary-hover);
+}
+
+.crm-button-outline {
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.crm-button-outline:hover {
+  background-color: var(--background-light);
+}
+
+.crm-button-danger {
+  background-color: var(--danger-color);
+  color: white;
+}
+
+.crm-button-danger:hover {
+  background-color: #dc2626;
+}
+
+/* Badges */
+.crm-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.crm-badge-primary {
+  background-color: rgba(79, 70, 229, 0.1);
+  color: var(--primary-color);
+}
+
+.crm-badge-secondary {
+  background-color: rgba(14, 165, 233, 0.1);
+  color: var(--secondary-color);
+}
+
+.crm-badge-success {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: var(--success-color);
+}
+
+.crm-badge-warning {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: var(--warning-color);
+}
+
+.crm-badge-danger {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--danger-color);
+}
+
+/* Progress Bars */
+.crm-progress-container {
+  width: 100%;
+  background-color: #e5e7eb;
+  border-radius: 9999px;
+  height: 0.5rem;
+  overflow: hidden;
+}
+
+.crm-progress-bar {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.5s ease;
+}
+
+.crm-progress-primary {
+  background-color: var(--primary-color);
+}
+
+.crm-progress-success {
+  background-color: var(--success-color);
+}
+
+.crm-progress-warning {
+  background-color: var(--warning-color);
+}
+
+.crm-progress-danger {
+  background-color: var(--danger-color);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.crm-animate-fade {
+  animation: fadeIn 0.5s ease forwards;
+}
+
+.crm-animate-slide-up {
+  animation: slideInUp 0.5s ease forwards;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .crm-container {
+    padding: 1rem;
+  }
+  
+  .crm-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .crm-stat-card {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .crm-stat-icon {
+    margin-right: 0;
+    margin-bottom: 1rem;
+  }
+}
