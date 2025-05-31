@@ -6,8 +6,6 @@
 
 A modern, AI-powered Customer Relationship Management system with advanced campaign management, intelligent customer segmentation, and real-time analytics.
 
-![Xeno CRM Dashboard](https://via.placeholder.com/800x400?text=Xeno+CRM+Dashboard)
-
 ## 🏗️ Architecture
 
 The XENO CRM platform follows a modern, modular architecture designed for scalability and maintainability:
