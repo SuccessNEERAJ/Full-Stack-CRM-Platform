@@ -27,28 +27,32 @@ import './config/passport.js';
 
 const app = express();
 
-// Create a simple CORS options object with production domains or localhost
-const corsOptions = {
-  origin: function(origin, callback) {
-    const allowedOrigins = process.env.NODE_ENV === 'production'
-      ? ['https://full-stack-crm-platform.vercel.app', 'https://xeno-crm.vercel.app']
-      : ['http://localhost:3000'];
-      
-    // Allow requests with no origin (like mobile apps, curl, etc)
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      console.log('CORS blocked origin:', origin);
-      callback(null, false);
-    }
-  },
+// Temporarily allow all origins to debug CORS issues
+app.use((req, res, next) => {
+  // Log all incoming requests for debugging
+  console.log(`Request from origin: ${req.headers.origin} to ${req.method} ${req.url}`);
+  
+  // Set CORS headers
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  
+  next();
+});
+
+// Still include the cors middleware for additional handling
+app.use(cors({
+  origin: true, // Reflect the request origin
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-};
-
-// Apply CORS middleware with our options
-app.use(cors(corsOptions));
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
+}));
 
 // Body parser middleware
 app.use(express.json());
