@@ -27,36 +27,24 @@ import './config/passport.js';
 
 const app = express();
 
-// =========== CORS CONFIGURATION - START ===========
-// IMPORTANT: Place CORS config at the top of middleware chain
-
-// Custom CORS middleware to handle all cases
+// Super simple CORS setup - allow ANY origin (for debugging only)
 app.use((req, res, next) => {
-  // Allow the Vercel frontend origin
-  const allowedOrigins = ['https://full-stack-crm-platform.vercel.app', 'http://localhost:3000'];
-  const origin = req.headers.origin;
+  // Set CORS headers - allow ALL origins (temporary debugging solution)
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+
+  // Log ALL requests for debugging
+  console.log(`CORS REQUEST: ${req.method} ${req.url} from ${req.headers.origin || 'unknown origin'}`);
   
-  if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  
-  // Essential CORS headers
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  
-  // Handle preflight requests
+  // Handle preflight
   if (req.method === 'OPTIONS') {
-    return res.sendStatus(204); // No content for OPTIONS
+    return res.status(200).end();
   }
-  
-  // Log all requests for debugging
-  console.log(`${req.method} ${req.url} from origin: ${origin || 'undefined'}`);
   
   next();
 });
-
-// =========== CORS CONFIGURATION - END ===========
 
 // Debug route to test CORS - can be accessed by frontend to verify connectivity
 app.get('/api/cors-test', (req, res) => {

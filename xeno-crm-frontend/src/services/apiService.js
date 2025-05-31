@@ -1,15 +1,20 @@
 import axios from 'axios';
 
-// Create an axios instance with default config
+// Create an axios instance with improved CORS config
 const apiService = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000',
-  withCredentials: true, // Important for cookies/sessions
+  withCredentials: true, // Critical for cross-domain cookies
   headers: {
     'Content-Type': 'application/json',
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
     'Expires': '0'
-  }
+  },
+  // Additional CORS-related settings
+  timeout: 10000, // 10 second timeout
+  // Do not send cookies for cross-domain requests by default
+  xsrfCookieName: null,
+  xsrfHeaderName: null
 });
 
 // Add a request interceptor
