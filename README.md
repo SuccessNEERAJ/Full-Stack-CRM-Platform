@@ -101,7 +101,7 @@ The architecture consists of three main tiers:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/xeno-crm.git
+git clone https://github.com/SuccessNEERAJ/xeno-crm.git
 
 # Navigate to the project directory
 cd xeno-crm
@@ -346,7 +346,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👥 Team
 
-- Your Name - *Lead Developer* - [GitHub Profile](https://github.com/yourusername)
+- Neeraj Jaiswal - *Lead Developer* - [GitHub Profile](https://github.com/SuccessNEERAJ)
 
 ## 🙏 Acknowledgements
 
