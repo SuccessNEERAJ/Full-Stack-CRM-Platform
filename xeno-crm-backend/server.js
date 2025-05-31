@@ -59,7 +59,8 @@ app.use(cors({
   exposedHeaders: ['Set-Cookie'],
   allowedHeaders: [
     'Content-Type', 'Authorization', 'X-Requested-With',
-    'Origin', 'Accept', 'Cache-Control', 'X-PINGOTHER'
+    'Origin', 'Accept', 'Cache-Control', 'X-PINGOTHER',
+    'pragma', 'access-control-request-headers'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   maxAge: 86400 // 24 hours in seconds
