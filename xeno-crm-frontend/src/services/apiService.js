@@ -53,5 +53,14 @@ apiService.interceptors.response.use(
   }
 );
 
+// Utility function to make requests through the proxy
+apiService.useProxy = (url, options = {}) => {
+  const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  const proxyUrl = `${baseUrl}/proxy/${encodeURIComponent(url)}`;
+  
+  console.log(`Making proxied request to: ${url} via ${proxyUrl}`);
+  return apiService(proxyUrl, options);
+};
+
 // Export the configured axios instance
 export default apiService;

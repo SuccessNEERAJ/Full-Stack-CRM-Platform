@@ -93,6 +93,56 @@ app.get('/api/cors-test', (req, res) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// CORS proxy middleware - simple implementation
+import fetch from 'node-fetch';
+app.use('/proxy/:url(*)', async (req, res) => {
+  try {
+    // Get the target URL from the path parameter
+    const targetUrl = req.params.url;
+    console.log(`CORS Proxy request for: ${targetUrl}`);
+    
+    // Forward all headers except host and connection
+    const headers = {};
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (key !== 'host' && key !== 'connection') {
+        headers[key] = value;
+      }
+    }
+    
+    // Forward the request to the target URL
+    const response = await fetch(targetUrl, {
+      method: req.method,
+      headers,
+      body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body),
+    });
+    
+    // Get the response headers
+    const responseHeaders = {};
+    response.headers.forEach((value, key) => {
+      responseHeaders[key] = value;
+    });
+    
+    // Set CORS headers
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, PUT, PATCH, POST, DELETE');
+    res.header('Access-Control-Allow-Headers', req.header('access-control-request-headers'));
+    
+    // Set other response headers
+    for (const [key, value] of Object.entries(responseHeaders)) {
+      if (key !== 'access-control-allow-origin') {
+        res.header(key, value);
+      }
+    }
+    
+    // Send the response
+    const responseBody = await response.text();
+    res.status(response.status).send(responseBody);
+  } catch (error) {
+    console.error('CORS Proxy error:', error);
+    res.status(500).json({ error: 'CORS Proxy error', message: error.message });
+  }
+});
+
 // Comprehensive session configuration for cross-domain authentication
 const sessionOptions = {
   name: 'xeno.sid', // Explicit session name
