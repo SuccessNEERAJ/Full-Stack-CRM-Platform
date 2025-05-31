@@ -31,7 +31,22 @@ router.get('/google/callback',
 // @desc    Get current user
 // @access  Private
 router.get('/current_user', (req, res) => {
+  // Debug headers for CORS troubleshooting
+  console.log('Current user request headers:', {
+    origin: req.headers.origin,
+    referer: req.headers.referer,
+    cookie: req.headers.cookie ? 'Present' : 'Absent'
+  });
+  
+  // Debug session
+  console.log('Session exists:', !!req.session);
+  console.log('User in session:', req.user ? req.user.email : 'No user');
+  
+  // Set additional headers to ensure CORS works properly
+  res.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+  
   if (req.user) {
+    // User is authenticated
     res.json({
       isAuthenticated: true,
       user: {
@@ -39,10 +54,16 @@ router.get('/current_user', (req, res) => {
         displayName: req.user.displayName,
         email: req.user.email,
         profileImage: req.user.profileImage
-      }
+      },
+      timestamp: new Date().toISOString()
     });
   } else {
-    res.json({ isAuthenticated: false });
+    // User is not authenticated
+    res.json({ 
+      isAuthenticated: false,
+      message: 'No user session found',
+      timestamp: new Date().toISOString()
+    });
   }
 });
 

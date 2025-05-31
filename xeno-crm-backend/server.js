@@ -27,28 +27,45 @@ import './config/passport.js';
 
 const app = express();
 
-// More permissive CORS configuration for debugging
-app.use(cors({
-  origin: function(origin, callback) {
-    callback(null, true); // Allow any origin during debugging
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
+// =========== CORS CONFIGURATION - START ===========
+// IMPORTANT: Place CORS config at the top of middleware chain
 
-// Log CORS requests
+// Custom CORS middleware to handle all cases
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Credentials', 'true');
+  // Allow the Vercel frontend origin
+  const allowedOrigins = ['https://full-stack-crm-platform.vercel.app', 'http://localhost:3000'];
+  const origin = req.headers.origin;
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
+  // Essential CORS headers
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204); // No content for OPTIONS
+  }
+  
+  // Log all requests for debugging
+  console.log(`${req.method} ${req.url} from origin: ${origin || 'undefined'}`);
+  
   next();
 });
 
-// Do not use app.options('*', cors()) as it causes path-to-regexp errors
+// =========== CORS CONFIGURATION - END ===========
 
-// Log all requests for debugging
-app.use((req, res, next) => {
-  console.log(`Request from origin: ${req.headers.origin} to ${req.method} ${req.url}`);
-  next();
+// Debug route to test CORS - can be accessed by frontend to verify connectivity
+app.get('/api/cors-test', (req, res) => {
+  res.json({ 
+    success: true, 
+    message: 'CORS is working correctly',
+    user: req.user ? req.user.email : 'not authenticated',
+    time: new Date().toISOString()
+  });
 });
 
 // Body parser middleware
@@ -81,9 +98,14 @@ if (process.env.NODE_ENV === 'production' && process.env.MONGO_URI) {
 
 // Configure cookie for cross-origin in production
 if (process.env.NODE_ENV === 'production') {
-  sessionOptions.cookie.secure = true;
-  sessionOptions.cookie.sameSite = 'none';
+  sessionOptions.cookie.secure = true; // Secure cookies require HTTPS
+  sessionOptions.cookie.sameSite = 'none'; // Required for cross-origin cookies
+  sessionOptions.cookie.httpOnly = true; // Prevent client-side JS from reading cookie
 }
+
+// Always enable these for proper cross-origin functionality
+sessionOptions.proxy = true; // Trust the reverse proxy
+sessionOptions.cookie.path = '/'; // Available on all paths
 
 // Apply session middleware
 app.use(session(sessionOptions));
