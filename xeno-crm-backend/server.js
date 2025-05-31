@@ -55,34 +55,38 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Session configuration with MongoDB store for production
-app.use(session({
+// Basic session configuration - simplified for stability
+const sessionOptions = {
   secret: process.env.SESSION_SECRET || 'xenocrmsecret',
   resave: false,
-  saveUninitialized: true, // Changed to true to ensure cookie is always sent
-  proxy: true, // Trust the reverse proxy for HTTPS
-  store: process.env.NODE_ENV === 'production'
-    ? MongoStore.create({
-        mongoUrl: process.env.MONGO_URI,
-        ttl: 24 * 60 * 60, // 1 day in seconds
-        autoRemove: 'native',
-        touchAfter: 24 * 3600 // time period in seconds between session updates
-      })
-    : null, // Use default memory store in development
+  saveUninitialized: true,
   cookie: {
-    secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
-    maxAge: 24 * 60 * 60 * 1000, // 1 day
-    sameSite: 'none', // Always use 'none' for cross-site
-    httpOnly: true, // Prevent client-side JS from reading the cookie
-    path: '/' // Ensure cookie is available for all paths
-    // Remove domain setting as it can cause issues with cross-domain auth
+    maxAge: 24 * 60 * 60 * 1000 // 1 day
   }
-}));
+};
 
-// Log session configuration for debugging
-console.log(`Session store: ${process.env.NODE_ENV === 'production' ? 'MongoDB' : 'Memory'}`);
-console.log(`Cookie secure: ${process.env.NODE_ENV === 'production'}`);
-console.log(`Cookie sameSite: none`);
+// Only use MongoDB store in production if MONGO_URI is available
+if (process.env.NODE_ENV === 'production' && process.env.MONGO_URI) {
+  try {
+    sessionOptions.store = MongoStore.create({
+      mongoUrl: process.env.MONGO_URI,
+      ttl: 24 * 60 * 60 // 1 day in seconds
+    });
+    console.log('Using MongoDB session store');
+  } catch (err) {
+    console.error('Failed to create MongoDB session store:', err.message);
+    console.log('Falling back to memory store');
+  }
+}
+
+// Configure cookie for cross-origin in production
+if (process.env.NODE_ENV === 'production') {
+  sessionOptions.cookie.secure = true;
+  sessionOptions.cookie.sameSite = 'none';
+}
+
+// Apply session middleware
+app.use(session(sessionOptions));
 
 // Log session configuration
 console.log(`Session configuration: ${process.env.NODE_ENV === 'production' ? 'MongoDB Store' : 'Memory Store'}`);
