@@ -24,12 +24,19 @@ passport.deserializeUser(async (id, done) => {
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   console.log('Configuring Google OAuth strategy');
   
+  // Determine the base URL based on environment
+  const baseURL = process.env.NODE_ENV === 'production'
+    ? process.env.BACKEND_URL || 'https://full-stack-crm-platform.onrender.com'
+    : `http://localhost:${process.env.PORT || 5000}`;
+    
   const googleOptions = {
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: `http://localhost:${process.env.PORT || 5000}/api/auth/google/callback`,
+    callbackURL: `${baseURL}/api/auth/google/callback`,
     scope: ['profile', 'email']
   };
+  
+  console.log(`OAuth callback URL: ${googleOptions.callbackURL}`);
   
   const googleCallback = async (accessToken, refreshToken, profile, done) => {
     try {
