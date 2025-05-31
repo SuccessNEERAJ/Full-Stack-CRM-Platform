@@ -28,8 +28,33 @@ import './config/passport.js';
 const app = express();
 
 // Super simple CORS setup - Extremely permissive CORS for debugging
+// Define allowed origins
+const allowedOrigins = [
+  'https://full-stack-crm-platform.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:5000'
+];
+
+// CORS configuration with specific origin handling
 app.use(cors({
-  origin: true, // Allow any origin
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, etc)
+    if (!origin) {
+      console.log('Request has no origin header');
+      return callback(null, true);
+    }
+    
+    console.log('Origin received:', origin);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      // Origin allowed
+      return callback(null, true);
+    } else {
+      // For development, allow any origin but log it
+      console.log('Unknown origin allowed:', origin);
+      return callback(null, true);
+    }
+  },
   credentials: true, // Critical for cookies
   exposedHeaders: ['Set-Cookie'],
   allowedHeaders: [
@@ -77,11 +102,11 @@ const sessionOptions = {
   rolling: true, // Refresh session with each response
   proxy: true, // Trust the reverse proxy
   cookie: {
-    maxAge: 24 * 60 * 60 * 1000, // 1 day
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days for better persistence
     path: '/', // Available on all paths
     httpOnly: true, // Prevent client-side JS from reading cookie
     // These are critical for cross-domain cookies:
-    secure: process.env.NODE_ENV === 'production', // Secure in production
+    secure: true, // Always use secure cookies in production and development
     sameSite: 'none' // Always use 'none' for cross-origin cookies
   }
 };

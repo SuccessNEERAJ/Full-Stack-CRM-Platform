@@ -20,7 +20,13 @@ const apiService = axios.create({
 // Add a request interceptor
 apiService.interceptors.request.use(
   (config) => {
-    // You can add any request modifications here
+    // Explicitly set the Origin header
+    config.headers['Origin'] = window.location.origin;
+    
+    // Log all requests for debugging
+    console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
+    console.log('Headers sent:', config.headers);
+    
     return config;
   },
   (error) => {
