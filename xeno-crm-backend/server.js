@@ -27,13 +27,21 @@ import './config/passport.js';
 
 const app = express();
 
-// CORS configuration that works across domains
+// More permissive CORS configuration for debugging
 app.use(cors({
-  origin: "https://full-stack-crm-platform.vercel.app",
+  origin: function(origin, callback) {
+    callback(null, true); // Allow any origin during debugging
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
+
+// Log CORS requests
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Credentials', 'true');
+  next();
+});
 
 // Do not use app.options('*', cors()) as it causes path-to-regexp errors
 
@@ -66,10 +74,15 @@ app.use(session({
     maxAge: 24 * 60 * 60 * 1000, // 1 day
     sameSite: 'none', // Always use 'none' for cross-site
     httpOnly: true, // Prevent client-side JS from reading the cookie
-    path: '/', // Ensure cookie is available for all paths
-    domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined // Specify domain in production
+    path: '/' // Ensure cookie is available for all paths
+    // Remove domain setting as it can cause issues with cross-domain auth
   }
 }));
+
+// Log session configuration for debugging
+console.log(`Session store: ${process.env.NODE_ENV === 'production' ? 'MongoDB' : 'Memory'}`);
+console.log(`Cookie secure: ${process.env.NODE_ENV === 'production'}`);
+console.log(`Cookie sameSite: none`);
 
 // Log session configuration
 console.log(`Session configuration: ${process.env.NODE_ENV === 'production' ? 'MongoDB Store' : 'Memory Store'}`);

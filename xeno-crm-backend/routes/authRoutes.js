@@ -18,8 +18,12 @@ router.get('/google',
 router.get('/google/callback',
   passport.authenticate('google', { failureRedirect: '/login' }),
   (req, res) => {
-    // Successful authentication, redirect to dashboard or frontend app
-    res.redirect(process.env.FRONTEND_URL || 'http://localhost:3000/dashboard');
+    // Log successful authentication
+    console.log('Authentication successful for user:', req.user?.email);
+    
+    // Redirect to frontend with auth=success parameter
+    // The frontend can use this to trigger a state refresh
+    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard?auth=success&t=${Date.now()}`);
   }
 );
 
