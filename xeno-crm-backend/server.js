@@ -95,11 +95,17 @@ app.use(express.urlencoded({ extended: false }));
 
 // CORS proxy middleware - simple implementation
 import fetch from 'node-fetch';
-app.use('/proxy/:url(*)', async (req, res) => {
+
+// Create a simpler CORS proxy route
+app.get('/proxy/:proxyUrl(*)', async (req, res) => {
   try {
-    // Get the target URL from the path parameter
-    const targetUrl = req.params.url;
-    console.log(`CORS Proxy request for: ${targetUrl}`);
+    // Get the URL to proxy from request parameters
+    const proxyUrl = req.params.proxyUrl;
+    console.log(`CORS Proxy request for: ${proxyUrl}`);
+    
+    if (!proxyUrl) {
+      return res.status(400).json({ error: 'Missing URL parameter' });
+    }
     
     // Forward all headers except host and connection
     const headers = {};
@@ -109,38 +115,44 @@ app.use('/proxy/:url(*)', async (req, res) => {
       }
     }
     
-    // Forward the request to the target URL
-    const response = await fetch(targetUrl, {
-      method: req.method,
-      headers,
-      body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body),
-    });
-    
-    // Get the response headers
-    const responseHeaders = {};
-    response.headers.forEach((value, key) => {
-      responseHeaders[key] = value;
+    // Make the request to the target URL
+    const response = await fetch(proxyUrl, {
+      method: 'GET', // For now, only support GET
+      headers
     });
     
     // Set CORS headers
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, PUT, PATCH, POST, DELETE');
-    res.header('Access-Control-Allow-Headers', req.header('access-control-request-headers'));
+    res.header('Access-Control-Allow-Methods', 'GET');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
-    // Set other response headers
-    for (const [key, value] of Object.entries(responseHeaders)) {
-      if (key !== 'access-control-allow-origin') {
+    // Copy response headers
+    response.headers.forEach((value, key) => {
+      // Skip CORS headers from original response
+      if (!key.toLowerCase().startsWith('access-control-')) {
         res.header(key, value);
       }
-    }
+    });
     
     // Send the response
     const responseBody = await response.text();
     res.status(response.status).send(responseBody);
+    
   } catch (error) {
     console.error('CORS Proxy error:', error);
-    res.status(500).json({ error: 'CORS Proxy error', message: error.message });
+    res.status(500).json({
+      error: 'CORS Proxy error',
+      message: error.message
+    });
   }
+});
+
+// Handle OPTIONS preflight for the proxy
+app.options('/proxy/:proxyUrl(*)', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.status(204).end();
 });
 
 // Comprehensive session configuration for cross-domain authentication
