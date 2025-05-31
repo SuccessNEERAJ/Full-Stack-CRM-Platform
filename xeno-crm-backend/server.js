@@ -97,7 +97,7 @@ if (process.env.NODE_ENV === 'production') {
 sessionOptions.proxy = true; // Trust the reverse proxy
 sessionOptions.cookie.path = '/'; // Available on all paths
 
-// Apply session middleware
+// Apply session middleware BEFORE passport initialization
 app.use(session(sessionOptions));
 
 // Log session configuration
@@ -105,10 +105,21 @@ console.log(`Session configuration: ${process.env.NODE_ENV === 'production' ? 'M
 console.log(`Cookie secure: ${process.env.NODE_ENV === 'production'}`);
 console.log(`Cookie sameSite: ${process.env.NODE_ENV === 'production' ? 'none' : 'lax'}`);
 
+// Debug middleware to log session before passport
+app.use((req, res, next) => {
+  console.log('Session before passport:', req.session.id || 'no session id');
+  next();
+});
 
 // Initialize Passport middleware
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Debug middleware to verify passport session
+app.use((req, res, next) => {
+  console.log('User after passport:', req.user ? `${req.user.email} (${req.user._id})` : 'not authenticated');
+  next();
+});
 
 // Routes
 app.use('/api/auth', authRoutes);

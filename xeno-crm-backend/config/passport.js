@@ -7,15 +7,26 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
+// Enhanced user serialization - important for cross-domain cookies
 passport.serializeUser((user, done) => {
-  done(null, user.id);
+  console.log('Serializing user:', user.email, user._id);
+  // Use String form of _id to prevent ObjectId serialization issues
+  done(null, user._id.toString());
 });
 
+// Enhanced deserialization with error logging
 passport.deserializeUser(async (id, done) => {
   try {
+    console.log('Deserializing user id:', id);
     const user = await User.findById(id);
+    if (!user) {
+      console.error('User not found during deserialization. ID:', id);
+      return done(null, false);
+    }
+    console.log('User found during deserialization:', user.email);
     done(null, user);
   } catch (err) {
+    console.error('Error during deserialization:', err.message);
     done(err, null);
   }
 });
