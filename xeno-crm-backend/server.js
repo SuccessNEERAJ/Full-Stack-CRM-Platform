@@ -27,14 +27,15 @@ import './config/passport.js';
 
 const app = express();
 
-// Simple CORS configuration based on Stack Overflow solution
+// CORS configuration that works across domains
 app.use(cors({
   origin: "https://full-stack-crm-platform.vercel.app",
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Handle preflight requests
-app.options('*', cors());
+// Do not use app.options('*', cors()) as it causes path-to-regexp errors
 
 // Log all requests for debugging
 app.use((req, res, next) => {
