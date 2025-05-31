@@ -101,11 +101,7 @@ The architecture consists of three main tiers:
 
 ```bash
 # Clone the repository
-git clone https://github.com/SuccessNEERAJ/xeno-crm.git
-
-# Navigate to the project directory
-cd xeno-crm
-```
+git clone https://github.com/SuccessNEERAJ/Full-Stack-CRM-Platform.git
 
 ## ⚙️ Environment Setup
 
