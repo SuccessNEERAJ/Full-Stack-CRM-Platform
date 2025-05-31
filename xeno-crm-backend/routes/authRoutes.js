@@ -20,10 +20,24 @@ router.get('/google/callback',
   (req, res) => {
     // Log successful authentication
     console.log('Authentication successful for user:', req.user?.email);
+    console.log('Session ID after auth:', req.session.id);
     
-    // Redirect to frontend with auth=success parameter
-    // The frontend can use this to trigger a state refresh
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard?auth=success&t=${Date.now()}`);
+    // Force session save to ensure it's stored before redirect
+    req.session.save((err) => {
+      if (err) {
+        console.error('Error saving session:', err);
+      }
+      
+      // Set additional headers for CORS and cache control
+      res.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+      
+      // Add session ID as query parameter for debugging
+      const redirectUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard?auth=success&sid=${req.session.id}&t=${Date.now()}`;
+      console.log('Redirecting to:', redirectUrl);
+      
+      // Redirect to frontend
+      res.redirect(redirectUrl);
+    });
   }
 );
 

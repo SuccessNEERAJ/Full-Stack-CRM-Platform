@@ -62,40 +62,50 @@ app.get('/api/cors-test', (req, res) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Basic session configuration - simplified for stability
+// Comprehensive session configuration for cross-domain authentication
 const sessionOptions = {
+  name: 'xeno.sid', // Explicit session name
   secret: process.env.SESSION_SECRET || 'xenocrmsecret',
   resave: false,
   saveUninitialized: true,
+  rolling: true, // Refresh session with each response
+  proxy: true, // Trust the reverse proxy
   cookie: {
-    maxAge: 24 * 60 * 60 * 1000 // 1 day
+    maxAge: 24 * 60 * 60 * 1000, // 1 day
+    path: '/', // Available on all paths
+    httpOnly: true, // Prevent client-side JS from reading cookie
+    // These are critical for cross-domain cookies:
+    secure: process.env.NODE_ENV === 'production', // Secure in production
+    sameSite: 'none' // Always use 'none' for cross-origin cookies
   }
 };
+
+// Debug cookie configuration
+console.log('Cookie configuration:', {
+  name: sessionOptions.name,
+  secure: sessionOptions.cookie.secure,
+  sameSite: sessionOptions.cookie.sameSite,
+  httpOnly: sessionOptions.cookie.httpOnly,
+  domain: sessionOptions.cookie.domain || 'not set'
+});
 
 // Only use MongoDB store in production if MONGO_URI is available
 if (process.env.NODE_ENV === 'production' && process.env.MONGO_URI) {
   try {
     sessionOptions.store = MongoStore.create({
       mongoUrl: process.env.MONGO_URI,
-      ttl: 24 * 60 * 60 // 1 day in seconds
+      ttl: 24 * 60 * 60, // 1 day in seconds
+      touchAfter: 1 * 3600, // Only update session once per hour (minimal writes)
+      crypto: {
+        secret: process.env.SESSION_SECRET || 'xenocrmsecret'
+      }
     });
-    console.log('Using MongoDB session store');
+    console.log('Using MongoDB session store with crypto');
   } catch (err) {
     console.error('Failed to create MongoDB session store:', err.message);
     console.log('Falling back to memory store');
   }
 }
-
-// Configure cookie for cross-origin in production
-if (process.env.NODE_ENV === 'production') {
-  sessionOptions.cookie.secure = true; // Secure cookies require HTTPS
-  sessionOptions.cookie.sameSite = 'none'; // Required for cross-origin cookies
-  sessionOptions.cookie.httpOnly = true; // Prevent client-side JS from reading cookie
-}
-
-// Always enable these for proper cross-origin functionality
-sessionOptions.proxy = true; // Trust the reverse proxy
-sessionOptions.cookie.path = '/'; // Available on all paths
 
 // Apply session middleware BEFORE passport initialization
 app.use(session(sessionOptions));
