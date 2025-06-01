@@ -1,4 +1,4 @@
-const jwt = require('jsonwebtoken');
+import jwt from 'jsonwebtoken';
 
 // Secret key for JWT signing - should be in environment variables in production
 const JWT_SECRET = process.env.JWT_SECRET || 'xeno-jwt-secret-key';
@@ -54,8 +54,4 @@ const requireAuth = (req, res, next) => {
   next();
 };
 
-module.exports = {
-  generateToken,
-  verifyToken,
-  requireAuth
-};
+export { generateToken, verifyToken, requireAuth };

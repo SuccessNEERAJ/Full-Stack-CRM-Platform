@@ -13,7 +13,7 @@ router.get('/google',
 );
 
 // Import JWT helper
-const { generateToken } = require('../utils/jwtHelper');
+import { generateToken, verifyToken } from '../utils/jwtHelper.js';
 
 // @route   GET /api/auth/google/callback
 // @desc    Google OAuth callback
@@ -67,7 +67,7 @@ router.get(
   }
 );
 
-const { verifyToken } = require('../utils/jwtHelper');
+// verifyToken is already imported at the top of the file
 
 // @route   GET /api/auth/current_user
 // @desc    Get current user
