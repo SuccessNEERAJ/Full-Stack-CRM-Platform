@@ -149,14 +149,16 @@ app.options('/proxy', (req, res) => {
 const sessionOptions = {
   name: 'xeno.sid', // Explicit session name
   secret: process.env.SESSION_SECRET || 'xenocrmsecret',
-  resave: false,
-  saveUninitialized: false, // Don't create session until something stored
+  resave: true, // Force session to be saved back to the store
+  saveUninitialized: true, // Save uninitialized sessions
   rolling: true, // Refresh session with each response
   proxy: true, // Trust the reverse proxy
   store: process.env.NODE_ENV === 'production'
     ? new MongoStore({
         mongoUrl: process.env.MONGO_URI,
-        touchAfter: 24 * 3600 // Only update the session once per day unless data changes
+        touchAfter: 24 * 3600, // Only update the session once per day unless data changes
+        stringify: false, // Don't stringify the session
+        autoRemove: 'native' // Use MongoDB TTL for session cleanup
       })
     : new session.MemoryStore(),
   cookie: {
@@ -164,8 +166,8 @@ const sessionOptions = {
     path: '/', // Available on all paths
     httpOnly: true, // Prevent client-side JS from reading cookie
     // These are critical for cross-domain cookies:
-    secure: process.env.NODE_ENV === 'production', // Only use secure in production
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' // 'none' for cross-origin cookies in production
+    secure: true, // Always use secure cookies
+    sameSite: 'none' // Always use 'none' for cross-origin cookies
   }
 };
 

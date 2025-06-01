@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import apiService from '../../services/apiService';
+import { setAuthToken } from '../../utils/authUtils';
 
 // MUI components
 import { 
@@ -278,29 +279,52 @@ const DashboardPage = () => {
     navigate(`/campaigns/${campaignId}`);
   };
 
-  // Handle auth redirect and session establishment
+  // Handle auth redirect and JWT token storage
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get('auth') === 'success') {
-      console.log('Auth success detected. Establishing session...');
+      console.log('Auth success detected. Processing authentication...');
       setAuthProcessing(true);
       
-      // Force an immediate API call to establish session cookie
-      apiService.get('/api/auth/current_user')
-        .then(response => {
-          console.log('Session established:', response.data);
-          
-          // Clear the URL parameters to prevent re-processing on refresh
-          // but keep the user on the dashboard page
-          navigate('/dashboard', { replace: true });
-          
-          // Update auth processing state
-          setAuthProcessing(false);
-        })
-        .catch(err => {
-          console.error('Error establishing session:', err);
-          setAuthProcessing(false);
-        });
+      // Check for JWT token in URL parameters
+      const token = params.get('token');
+      if (token) {
+        console.log('JWT token found in URL. Storing token...');
+        // Store the JWT token
+        setAuthToken(token);
+        
+        // Force an immediate API call to verify the token works
+        apiService.get('/api/auth/current_user')
+          .then(response => {
+            console.log('Authentication verified:', response.data);
+            
+            // Clear the URL parameters to prevent re-processing on refresh
+            // but keep the user on the dashboard page
+            navigate('/dashboard', { replace: true });
+            
+            // Update auth processing state
+            setAuthProcessing(false);
+          })
+          .catch(err => {
+            console.error('Error verifying authentication:', err);
+            setAuthProcessing(false);
+          });
+      } else {
+        console.warn('No JWT token found in URL parameters');
+        // Try the old session-based approach as fallback
+        apiService.get('/api/auth/current_user')
+          .then(response => {
+            console.log('Session check response:', response.data);
+            navigate('/dashboard', { replace: true });
+            setAuthProcessing(false);
+          })
+          .catch(err => {
+            console.error('Authentication failed:', err);
+            setAuthProcessing(false);
+            // Redirect to login if authentication failed
+            navigate('/login');
+          });
+      }
     }
   }, [location, navigate]);
   

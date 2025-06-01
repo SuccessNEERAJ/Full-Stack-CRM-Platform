@@ -1,27 +1,30 @@
 import axios from 'axios';
+import { getAuthToken } from '../utils/authUtils';
 
 // Create an axios instance with improved CORS config
 const apiService = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000',
-  withCredentials: true, // Critical for cross-domain cookies
+  withCredentials: true, // Keep this for backward compatibility
   headers: {
     'Content-Type': 'application/json',
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
     'Expires': '0'
   },
-  // Additional CORS-related settings
+  // Additional settings
   timeout: 10000, // 10 second timeout
-  // Do not send cookies for cross-domain requests by default
   xsrfCookieName: null,
   xsrfHeaderName: null
 });
 
-// Add a request interceptor
+// Add a request interceptor to include JWT token
 apiService.interceptors.request.use(
   (config) => {
-    // DO NOT set Origin header - browsers handle this automatically
-    // and will reject attempts to set it manually
+    // Add JWT token to Authorization header if available
+    const token = getAuthToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     
     // Log all requests for debugging
     console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);

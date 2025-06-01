@@ -12,6 +12,9 @@ router.get('/google',
   passport.authenticate('google', { scope: ['profile', 'email'] })
 );
 
+// Import JWT helper
+const { generateToken } = require('../utils/jwtHelper');
+
 // @route   GET /api/auth/google/callback
 // @desc    Google OAuth callback
 // @access  Public
@@ -22,15 +25,14 @@ router.get(
     // Double-check user is in session and has been serialized
     if (!req.user) {
       console.error('No user object after Google authentication');
-    } else {
-      console.log('User authenticated:', req.user.email);
-      // Force login flag to ensure cookie is set properly
-      req.login(req.user, (loginErr) => {
-        if (loginErr) {
-          console.error('Error on explicit login:', loginErr);
-        }
-      });
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=auth_failed`);
     }
+    
+    console.log('User authenticated:', req.user.email);
+    
+    // Generate JWT token
+    const token = generateToken(req.user);
+    console.log('JWT token generated for user:', req.user.email);
     
     // Force the session to be saved before redirection
     req.session.save((err) => {
@@ -55,17 +57,17 @@ router.get(
       // Ensure we don't have double slashes in the URL
       const baseUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
       
-      // Add more debug info to the redirect URL
-      const redirectUrl = `${baseUrl}/dashboard?auth=success&sid=${req.session.id}&t=${Date.now()}&user=${encodeURIComponent(req.user?.email || 'unknown')}`;
+      // Add JWT token to the redirect URL
+      const redirectUrl = `${baseUrl}/dashboard?auth=success&token=${encodeURIComponent(token)}&t=${Date.now()}&user=${encodeURIComponent(req.user?.email || 'unknown')}`;
       console.log('Redirecting to:', redirectUrl);
-      console.log('Session cookie set:', !!req.session);
-      console.log('User in session:', req.user ? req.user.email : 'No user');
       
-      // Redirect to frontend
+      // Redirect to frontend with JWT token
       res.redirect(redirectUrl);
     });
   }
 );
+
+const { verifyToken } = require('../utils/jwtHelper');
 
 // @route   GET /api/auth/current_user
 // @desc    Get current user
@@ -75,14 +77,9 @@ router.get('/current_user', (req, res) => {
   console.log('Current user request headers:', {
     origin: req.headers.origin,
     referer: req.headers.referer,
+    authorization: req.headers.authorization ? 'Present' : 'Absent',
     cookie: req.headers.cookie ? 'Present' : 'Absent'
   });
-  
-  console.log('Session ID in current_user:', req.session?.id || 'no session id');
-  console.log('Session exists:', !!req.session);
-  console.log('Passport in session:', req.session?.passport ? 'Yes' : 'No');
-  console.log('User in passport:', req.session?.passport?.user || 'None');
-  console.log('User object in request:', req.user ? req.user.email : 'None');
   
   // Set explicit CORS headers to ensure the cookies can be sent/received
   res.header('Access-Control-Allow-Origin', req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:3000');
@@ -94,55 +91,65 @@ router.get('/current_user', (req, res) => {
   res.header('Pragma', 'no-cache');
   res.header('Expires', '0');
   
-  // Ensure the session is saved (this might help with session persistence)
-  req.session.lastAccess = new Date().toISOString();
+  // Check for JWT token in Authorization header
+  const authHeader = req.headers.authorization;
+  let jwtUser = null;
   
-  // Explicitly save the session before responding
-  req.session.save((err) => {
-    if (err) {
-      console.error('Error saving session in current_user:', err);
-    }
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    const { valid, decoded } = verifyToken(token);
     
-    if (req.user) {
-      // User is authenticated
-      res.json({
-        isAuthenticated: true,
-        user: {
-          id: req.user._id,
-          displayName: req.user.displayName,
-          email: req.user.email,
-          profileImage: req.user.profileImage
-        },
-        sessionId: req.session.id,
-        timestamp: new Date().toISOString(),
-        message: 'Authentication successful'
-      });
+    if (valid) {
+      console.log('Valid JWT token found for user:', decoded.email);
+      jwtUser = decoded;
     } else {
-      // Try to reauthorize from session if req.user is missing but session exists
-      if (req.session && req.session.passport && req.session.passport.user) {
-        console.log('Session has user but req.user is missing - Passport deserialize issue');
-        
-        // Return info about the broken state
-        res.json({ 
-          isAuthenticated: false,
-          message: 'Session exists but user not deserialized properly',
-          sessionId: req.session.id,
-          sessionHasUser: true,
-          needsRelogin: true,
-          timestamp: new Date().toISOString()
-        });
-      } else {
-        // No authentication at all
-        res.json({ 
-          isAuthenticated: false,
-          message: 'No user session found',
-          sessionId: req.session?.id || 'none',
-          sessionExists: !!req.session,
-          timestamp: new Date().toISOString()
-        });
-      }
+      console.log('Invalid JWT token');
     }
-  });
+  }
+  
+  // First check if user is authenticated via session
+  if (req.user) {
+    console.log('User authenticated via session:', req.user.email);
+    
+    // User is authenticated via session
+    return res.json({
+      isAuthenticated: true,
+      user: {
+        id: req.user._id,
+        displayName: req.user.displayName,
+        email: req.user.email,
+        profileImage: req.user.profileImage
+      },
+      authMethod: 'session',
+      timestamp: new Date().toISOString()
+    });
+  } 
+  // Then check if user is authenticated via JWT
+  else if (jwtUser) {
+    console.log('User authenticated via JWT:', jwtUser.email);
+    
+    // User is authenticated via JWT
+    return res.json({
+      isAuthenticated: true,
+      user: {
+        id: jwtUser.id,
+        email: jwtUser.email,
+        displayName: jwtUser.displayName
+      },
+      authMethod: 'jwt',
+      timestamp: new Date().toISOString()
+    });
+  } 
+  // No authentication
+  else {
+    console.log('No authentication found');
+    
+    return res.json({ 
+      isAuthenticated: false,
+      message: 'Not authenticated',
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // @route   GET /api/auth/logout
