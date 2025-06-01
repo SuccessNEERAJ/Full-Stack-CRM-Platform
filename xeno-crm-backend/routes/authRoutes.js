@@ -13,32 +13,50 @@ router.get('/google',
 );
 
 // @route   GET /api/auth/google/callback
-// @desc    Google auth callback
+// @desc    Google OAuth callback
 // @access  Public
-router.get('/google/callback',
+router.get(
+  '/google/callback',
   passport.authenticate('google', { failureRedirect: '/login' }),
   (req, res) => {
-    // Log successful authentication
-    console.log('Authentication successful for user:', req.user?.email);
-    console.log('Session ID after auth:', req.session.id);
+    // Double-check user is in session and has been serialized
+    if (!req.user) {
+      console.error('No user object after Google authentication');
+    } else {
+      console.log('User authenticated:', req.user.email);
+      // Force login flag to ensure cookie is set properly
+      req.login(req.user, (loginErr) => {
+        if (loginErr) {
+          console.error('Error on explicit login:', loginErr);
+        }
+      });
+    }
     
-    // Force session save to ensure it's stored before redirect
+    // Force the session to be saved before redirection
     req.session.save((err) => {
       if (err) {
         console.error('Error saving session:', err);
       }
       
-      // Set additional headers for CORS and cache control
+      // Log session details for debugging
+      console.log('Session ID after auth:', req.session.id);
+      console.log('Session user after auth:', req.session.passport?.user);
+      
+      // Set very explicit cookie settings as headers
       res.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.header('Pragma', 'no-cache');
+      res.header('Expires', '0');
+      
+      // Ensure CORS headers are set correctly for the redirect
       res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'http://localhost:3000');
       res.header('Access-Control-Allow-Credentials', 'true');
+      res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
       
-      // Add session ID as query parameter for debugging
       // Ensure we don't have double slashes in the URL
       const baseUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
       
       // Add more debug info to the redirect URL
-      const redirectUrl = `${baseUrl}/dashboard?auth=success&sid=${req.session.id}&t=${Date.now()}`;
+      const redirectUrl = `${baseUrl}/dashboard?auth=success&sid=${req.session.id}&t=${Date.now()}&user=${encodeURIComponent(req.user?.email || 'unknown')}`;
       console.log('Redirecting to:', redirectUrl);
       console.log('Session cookie set:', !!req.session);
       console.log('User in session:', req.user ? req.user.email : 'No user');
@@ -60,40 +78,71 @@ router.get('/current_user', (req, res) => {
     cookie: req.headers.cookie ? 'Present' : 'Absent'
   });
   
-  console.log('Session ID in current_user:', req.session.id || 'no session id');
-  console.log('Session exists:', req.session ? 'true' : 'false');
-  console.log('User in session:', req.user ? req.user.email : 'No user');
+  console.log('Session ID in current_user:', req.session?.id || 'no session id');
+  console.log('Session exists:', !!req.session);
+  console.log('Passport in session:', req.session?.passport ? 'Yes' : 'No');
+  console.log('User in passport:', req.session?.passport?.user || 'None');
+  console.log('User object in request:', req.user ? req.user.email : 'None');
   
-  // Explicitly force the session cookie to be sent again with the response
-  req.session.touch();
+  // Set explicit CORS headers to ensure the cookies can be sent/received
+  res.header('Access-Control-Allow-Origin', req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:3000');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   
   // Set cache control headers to prevent caching
   res.header('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.header('Pragma', 'no-cache');
   res.header('Expires', '0');
   
-  if (req.user) {
-    // User is authenticated
-    res.json({
-      isAuthenticated: true,
-      user: {
-        id: req.user._id,
-        displayName: req.user.displayName,
-        email: req.user.email,
-        profileImage: req.user.profileImage
-      },
-      sessionId: req.session.id,
-      timestamp: new Date().toISOString()
-    });
-  } else {
-    // User is not authenticated
-    res.json({ 
-      isAuthenticated: false,
-      message: 'No user session found',
-      sessionId: req.session.id,
-      timestamp: new Date().toISOString()
-    });
-  }
+  // Ensure the session is saved (this might help with session persistence)
+  req.session.lastAccess = new Date().toISOString();
+  
+  // Explicitly save the session before responding
+  req.session.save((err) => {
+    if (err) {
+      console.error('Error saving session in current_user:', err);
+    }
+    
+    if (req.user) {
+      // User is authenticated
+      res.json({
+        isAuthenticated: true,
+        user: {
+          id: req.user._id,
+          displayName: req.user.displayName,
+          email: req.user.email,
+          profileImage: req.user.profileImage
+        },
+        sessionId: req.session.id,
+        timestamp: new Date().toISOString(),
+        message: 'Authentication successful'
+      });
+    } else {
+      // Try to reauthorize from session if req.user is missing but session exists
+      if (req.session && req.session.passport && req.session.passport.user) {
+        console.log('Session has user but req.user is missing - Passport deserialize issue');
+        
+        // Return info about the broken state
+        res.json({ 
+          isAuthenticated: false,
+          message: 'Session exists but user not deserialized properly',
+          sessionId: req.session.id,
+          sessionHasUser: true,
+          needsRelogin: true,
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        // No authentication at all
+        res.json({ 
+          isAuthenticated: false,
+          message: 'No user session found',
+          sessionId: req.session?.id || 'none',
+          sessionExists: !!req.session,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+  });
 });
 
 // @route   GET /api/auth/logout

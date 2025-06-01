@@ -150,16 +150,22 @@ const sessionOptions = {
   name: 'xeno.sid', // Explicit session name
   secret: process.env.SESSION_SECRET || 'xenocrmsecret',
   resave: false,
-  saveUninitialized: true,
+  saveUninitialized: false, // Don't create session until something stored
   rolling: true, // Refresh session with each response
   proxy: true, // Trust the reverse proxy
+  store: process.env.NODE_ENV === 'production'
+    ? new MongoStore({
+        mongoUrl: process.env.MONGO_URI,
+        touchAfter: 24 * 3600 // Only update the session once per day unless data changes
+      })
+    : new session.MemoryStore(),
   cookie: {
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days for better persistence
     path: '/', // Available on all paths
     httpOnly: true, // Prevent client-side JS from reading cookie
     // These are critical for cross-domain cookies:
-    secure: true, // Always use secure cookies in production and development
-    sameSite: 'none' // Always use 'none' for cross-origin cookies
+    secure: process.env.NODE_ENV === 'production', // Only use secure in production
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' // 'none' for cross-origin cookies in production
   }
 };
 
