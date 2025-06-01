@@ -27,45 +27,28 @@ import './config/passport.js';
 
 const app = express();
 
-// Super simple CORS setup - Extremely permissive CORS for debugging
-// Define allowed origins
-const allowedOrigins = [
-  'https://full-stack-crm-platform.vercel.app',
-  'http://localhost:3000',
-  'http://localhost:5000',
-  'https://full-stack-crm-platform.vercel.app/dashboard'
-];
-
-// CORS configuration with specific origin handling
+// ULTRA permissive CORS setup for debugging - CHANGE THIS BEFORE PRODUCTION RELEASE
 app.use(cors({
+  // Allow all origins
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, etc)
-    if (!origin) {
-      console.log('Request has no origin header');
-      return callback(null, true);
-    }
-    
-    console.log('Origin received:', origin);
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      // Origin allowed
-      return callback(null, true);
-    } else {
-      // For development, allow any origin but log it
-      console.log('Unknown origin allowed:', origin);
-      return callback(null, true);
-    }
+    callback(null, true);
   },
-  credentials: true, // Critical for cookies
+  // Essential settings for cross-domain cookies
+  credentials: true,
   exposedHeaders: ['Set-Cookie'],
-  allowedHeaders: [
-    'Content-Type', 'Authorization', 'X-Requested-With',
-    'Origin', 'Accept', 'Cache-Control', 'X-PINGOTHER',
-    'pragma', 'access-control-request-headers'
-  ],
+  
+  // Handle the preflight request for ANY headers the browser might send
+  allowedHeaders: ['*'], // Allow any headers
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   maxAge: 86400 // 24 hours in seconds
 }));
+
+// Log all requests for debugging
+app.use((req, res, next) => {
+  console.log(`\n[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log(`Origin: ${req.headers.origin || 'Unknown'}`);
+  next();
+});
 
 // Custom middleware for logging and OPTIONS handling
 app.use((req, res, next) => {
