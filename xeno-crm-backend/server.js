@@ -35,7 +35,7 @@ app.use(cors({
   },
   // Essential settings for cross-domain cookies
   credentials: true,
-  exposedHeaders: ['Set-Cookie'],
+  exposedHeaders: ['Set-Cookie', 'Authorization'],
   
   // Handle the preflight request for ANY headers the browser might send
   allowedHeaders: [
@@ -46,6 +46,15 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   maxAge: 86400 // 24 hours in seconds
 }));
+
+// Add explicit headers for every response
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || process.env.FRONTEND_URL || '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  next();
+});
 
 // Log all requests for debugging
 app.use((req, res, next) => {

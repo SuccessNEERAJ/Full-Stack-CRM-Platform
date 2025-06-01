@@ -90,32 +90,68 @@ const DashboardPage = () => {
         // Check if we have a token in the URL (for initial login)
         const params = new URLSearchParams(location.search);
         const tokenFromUrl = params.get('token');
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
         
-        // Create a service with or without the token
-        let service = apiService;
+        // Prepare headers
+        const headers = {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        };
         
-        // If we have a token in the URL, create a custom axios instance with the token
+        // Add Authorization header if token is available
         if (tokenFromUrl && params.get('auth') === 'success') {
           console.log('Using token from URL for initial data fetch');
-          service = axios.create({
-            baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000',
-            headers: {
-              'Authorization': `Bearer ${tokenFromUrl}`,
-              'Content-Type': 'application/json'
-            }
-          });
+          headers['Authorization'] = `Bearer ${tokenFromUrl}`;
+          console.log('Headers for data fetch:', JSON.stringify(headers));
         } else {
-          console.log('Using default apiService for data fetch');
+          console.log('No token available for data fetch');
         }
         
-        // Fetch real data from API with cache busting
-        const [customersRes, segmentsRes, campaignsRes, historicalDataRes] = await Promise.all([
-          service.get(`/api/customers?_t=${timestamp}`),
-          service.get(`/api/segments?_t=${timestamp}`),
-          service.get(`/api/campaigns?_t=${timestamp}`),
-          // This might fail if historical endpoint doesn't exist, we'll handle the error
-          service.get(`/api/stats/historical?_t=${timestamp}`).catch(() => ({ data: null }))
-        ]);
+        // Use fetch API instead of axios
+        let customersRes, segmentsRes, campaignsRes, historicalDataRes;
+        
+        try {
+          // Fetch customers
+          const customersResponse = await fetch(`${apiUrl}/api/customers?_t=${timestamp}`, {
+            method: 'GET',
+            headers: headers,
+            credentials: 'include'
+          });
+          customersRes = { data: await customersResponse.json() };
+          
+          // Fetch segments
+          const segmentsResponse = await fetch(`${apiUrl}/api/segments?_t=${timestamp}`, {
+            method: 'GET',
+            headers: headers,
+            credentials: 'include'
+          });
+          segmentsRes = { data: await segmentsResponse.json() };
+          
+          // Fetch campaigns
+          const campaignsResponse = await fetch(`${apiUrl}/api/campaigns?_t=${timestamp}`, {
+            method: 'GET',
+            headers: headers,
+            credentials: 'include'
+          });
+          campaignsRes = { data: await campaignsResponse.json() };
+          
+          // Fetch historical data (might not exist)
+          try {
+            const historicalResponse = await fetch(`${apiUrl}/api/stats/historical?_t=${timestamp}`, {
+              method: 'GET',
+              headers: headers,
+              credentials: 'include'
+            });
+            historicalDataRes = { data: await historicalResponse.json() };
+          } catch (error) {
+            historicalDataRes = { data: null };
+          }
+        } catch (error) {
+          console.error('Error fetching dashboard data:', error);
+          throw error;
+        }
         
         const customers = customersRes.data || [];
         const segments = segmentsRes.data || [];
@@ -321,63 +357,92 @@ const DashboardPage = () => {
           console.error('Failed to store token in localStorage:', e);
         }
         
-        // Create a custom axios instance with the token for this session
-        const authApiService = axios.create({
-          baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        // Try using the native fetch API instead of axios
+        console.log('Using native fetch API with JWT token');
         
-        console.log('Created custom axios instance with Authorization header');
+        // First verify authentication
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+        console.log('Making API call to verify token using fetch...');
         
-        // Force an immediate API call to verify the token works using the custom instance
-        console.log('Making API call to verify token...');
-        authApiService.get('/api/auth/current_user')
-          .then(response => {
-            console.log('Authentication verified:', response.data);
-            console.log('Request headers sent:', response.config.headers);
-            
-            // If authentication is successful, fetch data with the token
-            console.log('Fetching dashboard data with token...');
-            
-            // Fetch customers
-            authApiService.get(`/api/customers?_t=${Date.now()}`)
-              .then(res => {
-                console.log('Customers fetched successfully:', res.data.length);
-                setStats(prevStats => ({
-                  ...prevStats,
-                  totalCustomers: res.data.length
-                }));
-              })
-              .catch(err => console.error('Error fetching customers:', err));
-            
-            // Fetch campaigns
-            authApiService.get(`/api/campaigns?_t=${Date.now()}`)
-              .then(res => {
-                console.log('Campaigns fetched successfully:', res.data.length);
-                setStats(prevStats => ({
-                  ...prevStats,
-                  totalCampaigns: res.data.length,
-                  recentCampaigns: res.data.slice(0, 5)
-                }));
-              })
-              .catch(err => console.error('Error fetching campaigns:', err));
-            
-            // Clear the URL parameters to prevent re-processing on refresh
-            // but keep the user on the dashboard page
-            navigate('/dashboard', { replace: true });
-            
-            // Update auth processing state
-            setAuthProcessing(false);
-            setLoading(false);
-          })
-          .catch(err => {
-            console.error('Error verifying authentication:', err);
-            console.error('Request headers sent:', err.config?.headers);
-            setAuthProcessing(false);
+        // Create headers object with the token
+        const headers = {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        };
+        
+        // Log the headers being sent
+        console.log('Headers being sent:', JSON.stringify(headers));
+        
+        // Use fetch for authentication verification
+        fetch(`${apiUrl}/api/auth/current_user`, {
+          method: 'GET',
+          headers: headers,
+          credentials: 'include'
+        })
+        .then(response => {
+          console.log('Response status:', response.status);
+          console.log('Response headers:', JSON.stringify([...response.headers.entries()]));
+          return response.json();
+        })
+        .then(data => {
+          console.log('Authentication verified:', data);
+          
+          // If authentication is successful, fetch customers data
+          console.log('Fetching customers data with token...');
+          return fetch(`${apiUrl}/api/customers?_t=${Date.now()}`, {
+            method: 'GET',
+            headers: headers,
+            credentials: 'include'
           });
+        })
+        .then(response => response.json())
+        .then(customers => {
+          console.log('Customers fetched successfully:', customers.length);
+          setStats(prevStats => ({
+            ...prevStats,
+            totalCustomers: customers.length
+          }));
+          
+          // Fetch campaigns data
+          console.log('Fetching campaigns data with token...');
+          return fetch(`${apiUrl}/api/campaigns?_t=${Date.now()}`, {
+            method: 'GET',
+            headers: headers,
+            credentials: 'include'
+          });
+        })
+        .then(response => response.json())
+        .then(campaigns => {
+          console.log('Campaigns fetched successfully:', campaigns.length);
+          setStats(prevStats => ({
+            ...prevStats,
+            totalCampaigns: campaigns.length,
+            recentCampaigns: campaigns.slice(0, 5)
+          }));
+          
+          // Clear the URL parameters to prevent re-processing on refresh
+          // but keep the user on the dashboard page
+          navigate('/dashboard', { replace: true });
+          
+          // Update auth processing state
+          setAuthProcessing(false);
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error('Error in authentication or data fetching:', err);
+          setAuthProcessing(false);
+          setLoading(false);
+          
+          // Show error notification
+          setNotification({
+            open: true,
+            message: 'Authentication failed. Please try again.',
+            severity: 'error'
+          });
+        });
       } else {
         console.warn('No JWT token found in URL parameters');
         // Try the old session-based approach as fallback
