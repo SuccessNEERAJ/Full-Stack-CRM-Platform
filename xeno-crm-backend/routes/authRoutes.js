@@ -77,9 +77,12 @@ router.get('/current_user', (req, res) => {
   console.log('Current user request headers:', {
     origin: req.headers.origin,
     referer: req.headers.referer,
-    authorization: req.headers.authorization ? 'Present' : 'Absent',
+    authorization: req.headers.authorization ? `Present (starts with: ${req.headers.authorization.substring(0, 15)}...)` : 'Absent',
     cookie: req.headers.cookie ? 'Present' : 'Absent'
   });
+  
+  // Log all headers for debugging
+  console.log('All request headers:', JSON.stringify(req.headers));
   
   // Set explicit CORS headers to ensure the cookies can be sent/received
   res.header('Access-Control-Allow-Origin', req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:3000');

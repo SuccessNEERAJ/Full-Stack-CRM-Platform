@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import axios from 'axios';
 import apiService, { updateAuthHeader } from '../../services/apiService';
 import { setAuthToken } from '../../utils/authUtils';
 
@@ -86,13 +87,34 @@ const DashboardPage = () => {
         // Add timestamp to prevent caching
         const timestamp = new Date().getTime();
         
+        // Check if we have a token in the URL (for initial login)
+        const params = new URLSearchParams(location.search);
+        const tokenFromUrl = params.get('token');
+        
+        // Create a service with or without the token
+        let service = apiService;
+        
+        // If we have a token in the URL, create a custom axios instance with the token
+        if (tokenFromUrl && params.get('auth') === 'success') {
+          console.log('Using token from URL for initial data fetch');
+          service = axios.create({
+            baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000',
+            headers: {
+              'Authorization': `Bearer ${tokenFromUrl}`,
+              'Content-Type': 'application/json'
+            }
+          });
+        } else {
+          console.log('Using default apiService for data fetch');
+        }
+        
         // Fetch real data from API with cache busting
         const [customersRes, segmentsRes, campaignsRes, historicalDataRes] = await Promise.all([
-          apiService.get(`/api/customers?_t=${timestamp}`),
-          apiService.get(`/api/segments?_t=${timestamp}`),
-          apiService.get(`/api/campaigns?_t=${timestamp}`),
+          service.get(`/api/customers?_t=${timestamp}`),
+          service.get(`/api/segments?_t=${timestamp}`),
+          service.get(`/api/campaigns?_t=${timestamp}`),
           // This might fail if historical endpoint doesn't exist, we'll handle the error
-          apiService.get(`/api/stats/historical?_t=${timestamp}`).catch(() => ({ data: null }))
+          service.get(`/api/stats/historical?_t=${timestamp}`).catch(() => ({ data: null }))
         ]);
         
         const customers = customersRes.data || [];
@@ -291,24 +313,57 @@ const DashboardPage = () => {
       if (token) {
         console.log('JWT token found in URL:', token.substring(0, 20) + '...');
         
-        // Store the JWT token and log the result
-        const stored = setAuthToken(token);
-        console.log('Token stored successfully:', stored);
+        // Try to store the token in localStorage
+        try {
+          localStorage.setItem('xeno_auth_token', token);
+          console.log('Attempted to store token in localStorage');
+        } catch (e) {
+          console.error('Failed to store token in localStorage:', e);
+        }
         
-        // Verify the token was stored correctly
-        const storedToken = localStorage.getItem('xeno_auth_token');
-        console.log('Token in localStorage:', storedToken ? storedToken.substring(0, 20) + '...' : 'Not found');
+        // Create a custom axios instance with the token for this session
+        const authApiService = axios.create({
+          baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
         
-        // Update the Authorization header in all future requests
-        updateAuthHeader();
-        console.log('Authorization header updated for all future requests');
+        console.log('Created custom axios instance with Authorization header');
         
-        // Force an immediate API call to verify the token works
+        // Force an immediate API call to verify the token works using the custom instance
         console.log('Making API call to verify token...');
-        apiService.get('/api/auth/current_user')
+        authApiService.get('/api/auth/current_user')
           .then(response => {
             console.log('Authentication verified:', response.data);
             console.log('Request headers sent:', response.config.headers);
+            
+            // If authentication is successful, fetch data with the token
+            console.log('Fetching dashboard data with token...');
+            
+            // Fetch customers
+            authApiService.get(`/api/customers?_t=${Date.now()}`)
+              .then(res => {
+                console.log('Customers fetched successfully:', res.data.length);
+                setStats(prevStats => ({
+                  ...prevStats,
+                  totalCustomers: res.data.length
+                }));
+              })
+              .catch(err => console.error('Error fetching customers:', err));
+            
+            // Fetch campaigns
+            authApiService.get(`/api/campaigns?_t=${Date.now()}`)
+              .then(res => {
+                console.log('Campaigns fetched successfully:', res.data.length);
+                setStats(prevStats => ({
+                  ...prevStats,
+                  totalCampaigns: res.data.length,
+                  recentCampaigns: res.data.slice(0, 5)
+                }));
+              })
+              .catch(err => console.error('Error fetching campaigns:', err));
             
             // Clear the URL parameters to prevent re-processing on refresh
             // but keep the user on the dashboard page
@@ -316,6 +371,7 @@ const DashboardPage = () => {
             
             // Update auth processing state
             setAuthProcessing(false);
+            setLoading(false);
           })
           .catch(err => {
             console.error('Error verifying authentication:', err);
