@@ -17,22 +17,46 @@ const apiService = axios.create({
   xsrfHeaderName: null
 });
 
+// Set default headers function - can be called anytime to update headers
+export const updateAuthHeader = () => {
+  const token = getAuthToken();
+  if (token) {
+    apiService.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    console.log('Default Authorization header set globally');
+  } else {
+    delete apiService.defaults.headers.common['Authorization'];
+  }
+};
+
+// Initialize headers
+updateAuthHeader();
+
 // Add a request interceptor to include JWT token
 apiService.interceptors.request.use(
   (config) => {
     // Add JWT token to Authorization header if available
     const token = getAuthToken();
+    console.log('JWT token available:', token ? 'Yes (length: ' + token.length + ')' : 'No');
+    
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      // Explicitly set the Authorization header
+      config.headers = {
+        ...config.headers,
+        'Authorization': `Bearer ${token}`
+      };
+      console.log('Authorization header set:', `Bearer ${token.substring(0, 20)}...`);
+    } else {
+      console.warn('No JWT token found in localStorage');
     }
     
     // Log all requests for debugging
     console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
-    console.log('Headers sent:', config.headers);
+    console.log('Headers being sent:', JSON.stringify(config.headers));
     
     return config;
   },
   (error) => {
+    console.error('Request interceptor error:', error);
     return Promise.reject(error);
   }
 );

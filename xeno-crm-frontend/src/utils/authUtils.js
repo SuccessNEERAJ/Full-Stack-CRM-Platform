@@ -4,21 +4,54 @@
 
 // Store the JWT token in localStorage
 export const setAuthToken = (token) => {
-  if (token) {
-    localStorage.setItem('xeno_auth_token', token);
-    return true;
+  if (!token) {
+    console.error('Attempted to store empty token');
+    return false;
   }
-  return false;
+  
+  try {
+    // Ensure we're storing a string
+    const tokenString = String(token);
+    console.log(`Storing token (length: ${tokenString.length})`);
+    
+    // Store in localStorage
+    localStorage.setItem('xeno_auth_token', tokenString);
+    
+    // Verify it was stored correctly
+    const storedToken = localStorage.getItem('xeno_auth_token');
+    const success = !!storedToken && storedToken === tokenString;
+    console.log(`Token storage ${success ? 'successful' : 'failed'}`);
+    
+    return success;
+  } catch (error) {
+    console.error('Error storing auth token:', error);
+    return false;
+  }
 };
 
 // Get the JWT token from localStorage
 export const getAuthToken = () => {
-  return localStorage.getItem('xeno_auth_token');
+  try {
+    const token = localStorage.getItem('xeno_auth_token');
+    if (!token) {
+      console.log('No token found in localStorage');
+      return null;
+    }
+    return token;
+  } catch (error) {
+    console.error('Error retrieving auth token:', error);
+    return null;
+  }
 };
 
 // Remove the JWT token from localStorage
 export const removeAuthToken = () => {
-  localStorage.removeItem('xeno_auth_token');
+  try {
+    localStorage.removeItem('xeno_auth_token');
+    console.log('Auth token removed from localStorage');
+  } catch (error) {
+    console.error('Error removing auth token:', error);
+  }
 };
 
 // Check if a token exists and is not expired

@@ -10,12 +10,13 @@ import {
   simulateDeliveryCallback
 } from '../controllers/campaignController.js';
 import { validateVendorWebhook } from '../middleware/vendorAuthMiddleware.js';
+import { requireAuth } from '../middleware/authMiddleware.js';
 
-// Campaign management routes
-router.post('/', launchCampaign);
-router.get('/', getCampaigns);
-router.get('/:id', getCampaignDetails);
-router.delete('/:id', deleteCampaign);
+// Protected campaign management routes (require authentication)
+router.post('/', requireAuth, launchCampaign);
+router.get('/', requireAuth, getCampaigns);
+router.get('/:id', requireAuth, getCampaignDetails);
+router.delete('/:id', requireAuth, deleteCampaign);
 
 // Delivery receipt API endpoint (for vendor callbacks)
 router.post('/delivery-receipt', validateVendorWebhook, updateDeliveryStatus);

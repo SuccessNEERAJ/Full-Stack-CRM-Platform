@@ -8,6 +8,10 @@ import {
   updateCustomer,
   deleteCustomer 
 } from '../controllers/customerController.js';
+import { requireAuth } from '../middleware/authMiddleware.js';
+
+// Apply requireAuth middleware to all routes
+router.use(requireAuth);
 
 // GET all customers
 router.get('/', getCustomers);

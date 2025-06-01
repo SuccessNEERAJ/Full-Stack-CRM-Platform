@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import apiService from '../../services/apiService';
+import apiService, { updateAuthHeader } from '../../services/apiService';
 import { setAuthToken } from '../../utils/authUtils';
 
 // MUI components
@@ -289,14 +289,26 @@ const DashboardPage = () => {
       // Check for JWT token in URL parameters
       const token = params.get('token');
       if (token) {
-        console.log('JWT token found in URL. Storing token...');
-        // Store the JWT token
-        setAuthToken(token);
+        console.log('JWT token found in URL:', token.substring(0, 20) + '...');
+        
+        // Store the JWT token and log the result
+        const stored = setAuthToken(token);
+        console.log('Token stored successfully:', stored);
+        
+        // Verify the token was stored correctly
+        const storedToken = localStorage.getItem('xeno_auth_token');
+        console.log('Token in localStorage:', storedToken ? storedToken.substring(0, 20) + '...' : 'Not found');
+        
+        // Update the Authorization header in all future requests
+        updateAuthHeader();
+        console.log('Authorization header updated for all future requests');
         
         // Force an immediate API call to verify the token works
+        console.log('Making API call to verify token...');
         apiService.get('/api/auth/current_user')
           .then(response => {
             console.log('Authentication verified:', response.data);
+            console.log('Request headers sent:', response.config.headers);
             
             // Clear the URL parameters to prevent re-processing on refresh
             // but keep the user on the dashboard page
@@ -307,6 +319,7 @@ const DashboardPage = () => {
           })
           .catch(err => {
             console.error('Error verifying authentication:', err);
+            console.error('Request headers sent:', err.config?.headers);
             setAuthProcessing(false);
           });
       } else {
