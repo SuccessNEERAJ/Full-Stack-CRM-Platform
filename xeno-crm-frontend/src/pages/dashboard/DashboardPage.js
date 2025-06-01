@@ -25,7 +25,9 @@ import {
   LinearProgress,
   Tooltip,
   useTheme,
-  alpha
+  alpha,
+  Snackbar,
+  Alert
 } from '@mui/material';
 
 // Icons
@@ -48,6 +50,11 @@ const DashboardPage = () => {
   const location = useLocation();
   const theme = useTheme();
   const [loading, setLoading] = useState(true);
+  const [notification, setNotification] = useState({
+    open: false,
+    message: '',
+    severity: 'info'
+  });
   const [authProcessing, setAuthProcessing] = useState(false);
   const [stats, setStats] = useState({
     totalCustomers: 0,
@@ -467,6 +474,10 @@ const DashboardPage = () => {
     // No animation code needed
   }, [stats]);
 
+  const handleCloseNotification = () => {
+    setNotification(prev => ({ ...prev, open: false }));
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
@@ -477,6 +488,21 @@ const DashboardPage = () => {
 
   return (
     <Box>
+      {/* Notification Snackbar */}
+      <Snackbar 
+        open={notification.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseNotification}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleCloseNotification} 
+          severity={notification.severity} 
+          sx={{ width: '100%' }}
+        >
+          {notification.message}
+        </Alert>
+      </Snackbar>
       {/* Welcome Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
