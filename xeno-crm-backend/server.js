@@ -32,7 +32,8 @@ const app = express();
 const allowedOrigins = [
   'https://full-stack-crm-platform.vercel.app',
   'http://localhost:3000',
-  'http://localhost:5000'
+  'http://localhost:5000',
+  'https://full-stack-crm-platform.vercel.app/dashboard'
 ];
 
 // CORS configuration with specific origin handling
