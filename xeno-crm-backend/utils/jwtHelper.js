@@ -26,32 +26,5 @@ const verifyToken = (token) => {
   }
 };
 
-// Middleware to check if request has a valid JWT token
-const requireAuth = (req, res, next) => {
-  // First check if user is already authenticated via session
-  if (req.user) {
-    return next();
-  }
+export { generateToken, verifyToken };
 
-  // Check for token in Authorization header
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'No token provided' });
-  }
-
-  // Extract the token
-  const token = authHeader.split(' ')[1];
-  
-  // Verify the token
-  const { valid, decoded, error } = verifyToken(token);
-  
-  if (!valid) {
-    return res.status(401).json({ error: 'Invalid or expired token', details: error });
-  }
-  
-  // Set the user on the request object
-  req.user = decoded;
-  next();
-};
-
-export { generateToken, verifyToken, requireAuth };

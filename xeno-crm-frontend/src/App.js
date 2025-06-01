@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import { setAuthToken } from './utils/authUtils';
+import { updateAuthHeader } from './services/apiService';
 import { NotificationsProvider } from './context/NotificationsContext';
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import theme from './theme/theme';
@@ -61,6 +63,27 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function App() {
+  // Extract token from URL if present
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    
+    if (token) {
+      console.log('Token found in URL, storing in localStorage');
+      setAuthToken(token);
+      updateAuthHeader();
+      
+      // Clean up URL by removing the token parameter
+      const newUrl = window.location.pathname + 
+        window.location.search.replace(/[&?]token=[^&]+/, '') + 
+        window.location.hash;
+      
+      window.history.replaceState({}, document.title, newUrl);
+    } else {
+      console.log('No token found in URL');
+    }
+  }, []);
+  
   return (
     <ThemeProvider theme={theme}>
       <NotificationsProvider>

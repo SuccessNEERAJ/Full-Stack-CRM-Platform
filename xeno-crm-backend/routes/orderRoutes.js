@@ -8,6 +8,10 @@ import {
   updateOrder,
   deleteOrder 
 } from '../controllers/orderController.js';
+import { requireAuth } from '../middleware/authMiddleware.js';
+
+// Apply requireAuth middleware to all routes
+router.use(requireAuth);
 
 // GET all orders
 router.get('/', getOrders);

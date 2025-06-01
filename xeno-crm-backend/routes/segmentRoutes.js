@@ -9,6 +9,10 @@ import {
   updateSegment,
   deleteSegment 
 } from '../controllers/segmentController.js';
+import { requireAuth } from '../middleware/authMiddleware.js';
+
+// Apply requireAuth middleware to all routes
+router.use(requireAuth);
 
 // GET all segments
 router.get('/', getSegments);

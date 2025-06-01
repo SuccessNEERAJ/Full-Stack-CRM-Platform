@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import apiService from '../services/apiService';
+import { getAuthToken } from '../utils/authUtils';
+import axios from 'axios';
 
 // Create the context
 const NotificationsContext = createContext();
@@ -173,18 +175,67 @@ export const NotificationsProvider = ({ children }) => {
       // Add timestamp to prevent caching
       const timestamp = new Date().getTime();
       
-      // Fetch real data from API with cache busting
-      const [customersRes, segmentsRes, campaignsRes] = await Promise.all([
-        apiService.get(`/api/customers?_t=${timestamp}`),
-        apiService.get(`/api/segments?_t=${timestamp}`),
-        apiService.get(`/api/campaigns?_t=${timestamp}`)
-      ]);
+      // Check for token in URL or localStorage
+      const params = new URLSearchParams(window.location.search);
+      const tokenFromUrl = params.get('token');
+      const tokenFromStorage = getAuthToken();
+      const token = tokenFromUrl || tokenFromStorage;
+      
+      console.log('NotificationsContext: Token available:', token ? 'Yes' : 'No');
+      
+      // If we don't have a token yet, don't try to fetch data
+      if (!token) {
+        console.log('NotificationsContext: No token available, skipping fetch');
+        return;
+      }
+      
+      // Create headers with token
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      };
+      
+      console.log('NotificationsContext: Using token for API calls');
+      
+      // Use fetch API for consistent header handling
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      
+      // Fetch data with token
+      const customersResponse = await fetch(`${apiUrl}/api/customers?_t=${timestamp}`, {
+        method: 'GET',
+        headers: headers,
+        credentials: 'include'
+      });
+      
+      const segmentsResponse = await fetch(`${apiUrl}/api/segments?_t=${timestamp}`, {
+        method: 'GET',
+        headers: headers,
+        credentials: 'include'
+      });
+      
+      const campaignsResponse = await fetch(`${apiUrl}/api/campaigns?_t=${timestamp}`, {
+        method: 'GET',
+        headers: headers,
+        credentials: 'include'
+      });
+      
+      // Process responses
+      if (!customersResponse.ok || !segmentsResponse.ok || !campaignsResponse.ok) {
+        throw new Error('One or more API requests failed');
+      }
+      
+      const customersData = await customersResponse.json();
+      const segmentsData = await segmentsResponse.json();
+      const campaignsData = await campaignsResponse.json();
       
       // Process the data to create notifications
       processNotifications({
-        customers: customersRes.data || [],
-        segments: segmentsRes.data || [],
-        campaigns: campaignsRes.data || []
+        customers: customersData || [],
+        segments: segmentsData || [],
+        campaigns: campaignsData || []
       });
       
     } catch (error) {
@@ -245,16 +296,40 @@ export const NotificationsProvider = ({ children }) => {
     updateUnreadCount();
   };
 
-  // Fetch notifications when component mounts
+  // Track authentication status
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Check for authentication when component mounts or URL changes
   useEffect(() => {
-    fetchNotifications();
+    // Check for token in URL or localStorage
+    const params = new URLSearchParams(window.location.search);
+    const tokenFromUrl = params.get('token');
+    const tokenFromStorage = getAuthToken();
+    const hasToken = tokenFromUrl || tokenFromStorage;
     
+    console.log('NotificationsContext: Authentication check -', hasToken ? 'Token found' : 'No token');
+    setIsAuthenticated(!!hasToken);
+    
+    // If authenticated, fetch notifications
+    if (hasToken) {
+      fetchNotifications();
+    }
+  }, [window.location.search]); // Re-run when URL changes (for token in URL)
+  
+  // Set up interval to refresh notifications if authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      console.log('NotificationsContext: Not authenticated, skipping notification interval');
+      return;
+    }
+    
+    console.log('NotificationsContext: Setting up notification refresh interval');
     // Set up interval to refresh notifications every 60 seconds
     const intervalId = setInterval(fetchNotifications, 60000);
     
     // Clean up interval on unmount
     return () => clearInterval(intervalId);
-  }, []);
+  }, [isAuthenticated]);
 
   // Update unread count whenever notifications change
   useEffect(() => {
