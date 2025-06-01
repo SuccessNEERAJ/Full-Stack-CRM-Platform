@@ -38,7 +38,11 @@ app.use(cors({
   exposedHeaders: ['Set-Cookie'],
   
   // Handle the preflight request for ANY headers the browser might send
-  allowedHeaders: ['*'], // Allow any headers
+  allowedHeaders: [
+    'Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 
+    'Accept', 'Cache-Control', 'X-PINGOTHER', 'pragma', 'expires',
+    'cache-control', 'access-control-request-headers', '*'
+  ], // Explicitly list all headers plus wildcard
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   maxAge: 86400 // 24 hours in seconds
 }));
