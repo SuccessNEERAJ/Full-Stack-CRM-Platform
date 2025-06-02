@@ -9,7 +9,10 @@ dotenv.config();
 const API_KEYS = {
   segmentRules: process.env.GROQ_API_KEY_SEGMENT_RULES,
   messageSuggestions: process.env.GROQ_API_KEY_MESSAGE_SUGGESTIONS,
-  campaignSummary: process.env.GROQ_API_KEY_CAMPAIGN_SUMMARY
+  campaignSummary: process.env.GROQ_API_KEY_CAMPAIGN_SUMMARY,
+  customerTrends: process.env.GROQ_API_KEY || process.env.GROQ_API_KEY_SEGMENT_RULES,
+  segmentRecommendations: process.env.GROQ_API_KEY || process.env.GROQ_API_KEY_MESSAGE_SUGGESTIONS,
+  campaignSuggestions: process.env.GROQ_API_KEY || process.env.GROQ_API_KEY_CAMPAIGN_SUMMARY
 };
 
 /**

@@ -67,6 +67,50 @@ The architecture consists of three main tiers:
 - Churn risk identification
 - Personalized communication suggestions
 
+## 🔐 Security Features
+
+### Authentication & Authorization
+
+#### JWT-Based Authentication
+- **Secure Token Generation**: Uses JSON Web Tokens (JWT) signed with a secure secret key
+- **Token Structure**: Contains user ID, email, and other essential claims
+- **Token Storage**: Securely stored in localStorage as 'xeno_auth_token'
+- **Expiration**: Tokens expire after 30 days for enhanced security
+- **Authorization Flow**:
+  - Tokens are generated during login/OAuth authentication
+  - Attached to all API requests in the Authorization header
+  - Verified on the backend with the JWT secret
+  - Failed verification triggers automatic logout
+
+#### Authentication Middleware
+- **Token Verification**: Validates signature, expiration, and required fields
+- **Request Context**: Adds authenticated user data to request context (req.user)
+- **Response Headers**: Adds user ID to response headers (X-User-ID) for frontend validation
+- **Comprehensive Error Handling**: Different error responses for missing, invalid, or expired tokens
+
+### Multi-Tenant Data Isolation
+
+#### Robust Tenant Isolation Strategy
+- **User-Based Data Separation**: All data (customers, segments, campaigns, orders) is strictly segregated by user ID
+- **Mandatory Filtering**: Every database query includes userId filters to prevent data leakage
+- **Deep Integration**: Tenant isolation enforced at every data access point:
+  - MongoDB schemas include userId fields with appropriate indexing
+  - Database query construction consistently applies userId filters
+  - Complex queries (with AND/OR logic) are carefully constructed to maintain isolation
+
+#### Frontend-Backend Validation
+- **Double-Check Mechanism**: Frontend validates that response data belongs to the authenticated user
+- **Cross-Verification**: User ID in JWT token is verified against user ID in response headers
+- **Automatic Security Response**: Detects and handles potential tenant isolation breaches by:
+  - Clearing invalid tokens
+  - Redirecting to login
+  - Preventing display of unauthorized data
+
+#### Segment & Campaign Isolation
+- **Segmented Data Access**: Users can only access and manipulate their own customer segments
+- **Preview Protection**: Audience previews and campaign targeting strictly limited to user's own customers
+- **Logical Query Construction**: Complex segment conditions combined with userId filters using MongoDB's $and and $or operators
+
 ## 🛠️ Technology Stack
 
 ### Frontend

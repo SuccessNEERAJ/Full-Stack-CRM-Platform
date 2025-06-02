@@ -49,6 +49,15 @@ apiService.interceptors.request.use(
       console.log('Request headers:', JSON.stringify(config.headers));
     } else {
       console.log(`No token available for request to ${config.url}`);
+      
+      // If token is missing and this is an authenticated endpoint, we should redirect to login
+      if (!config.url.includes('/auth/') && !config.url.includes('/login')) {
+        console.warn('Attempting to access protected endpoint without token - may need to redirect to login');
+        
+        // Add a flag to indicate this request is likely to fail authentication
+        config._noAuth = true;
+      }
+      
       // Try to get token directly from localStorage as a fallback
       const fallbackToken = localStorage.getItem('xeno_auth_token');
       if (fallbackToken) {
@@ -71,18 +80,60 @@ apiService.interceptors.request.use(
   }
 );
 
-// Add a response interceptor
+// Add a response interceptor with enhanced token handling
 apiService.interceptors.response.use(
   (response) => {
-    // Any status code within the range of 2xx
+    // Verify the response contains the correct user context
+    // This helps detect potential tenant isolation issues
+    if (response.headers && response.headers['x-user-id']) {
+      const responseUserId = response.headers['x-user-id'];
+      const currentToken = getAuthToken();
+      
+      if (currentToken) {
+        try {
+          // Verify user ID from token matches response
+          const tokenData = JSON.parse(atob(currentToken.split('.')[1]));
+          if (tokenData.id && tokenData.id !== responseUserId) {
+            console.error('User ID mismatch detected! Token user:', tokenData.id, 'Response user:', responseUserId);
+            // This indicates a potential tenant isolation issue - force refresh auth
+            localStorage.removeItem('xeno_auth_token');
+            window.location.href = '/login?error=tenant_isolation_error';
+            return Promise.reject(new Error('Authentication error: User context mismatch'));
+          }
+        } catch (e) {
+          console.error('Error parsing token:', e);
+        }
+      }
+    }
+    
     return response;
   },
   (error) => {
-    // Handle 401 Unauthorized errors (redirect to login)
+    // Enhanced error handling
+    console.error('API Error:', error.message, error.response?.status);
+    
+    // Handle authentication errors (401 Unauthorized)
     if (error.response && error.response.status === 401) {
-      // If not already on the login page
+      console.warn('Authentication error detected - clearing invalid token');
+      
+      // Clear the invalid token
+      localStorage.removeItem('xeno_auth_token');
+      
+      // If not already on the login page, redirect to login
       if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+        window.location.href = '/login?error=session_expired';
+        return Promise.reject(new Error('Session expired'));
+      }
+    }
+    
+    // Handle forbidden errors (403) which might indicate tenant isolation issues
+    if (error.response && error.response.status === 403) {
+      console.warn('Possible tenant isolation issue detected');
+      
+      // If not already on the login page, redirect to login with specific error
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login?error=access_denied';
+        return Promise.reject(new Error('Access denied - possible tenant isolation issue'));
       }
     }
     

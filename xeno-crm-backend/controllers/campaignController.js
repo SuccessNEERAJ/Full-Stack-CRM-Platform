@@ -137,19 +137,54 @@ const launchCampaign = async (req, res) => {
       return res.status(400).json({ message: "Invalid segment ID format" });
     }
 
-    const segment = await Segment.findById(segmentId);
+    // Make sure the segment belongs to the current user
+    const segment = await Segment.findOne({
+      _id: segmentId,
+      userId: req.user._id
+    });
+    
     if (!segment) {
-      return res.status(404).json({ message: "Segment not found" });
+      return res.status(404).json({ message: "Segment not found or you don't have access to it" });
     }
 
-    // Find customers matching the segment conditions
-    const matchedCustomers = await Customer.find(segment.conditions);
+    // IMPORTANT: Always enforce user isolation first and foremost
+    // This ensures that no matter what other conditions are applied,
+    // we ONLY ever get customers belonging to the current user
+    const userFilter = { userId: req.user._id };
+    
+    // Segment conditions from the database
+    const segmentConditions = segment.conditions || {};
+    
+    // Construct a MongoDB query that properly respects both tenant isolation
+    // and the segment's conditions and logic type
+    let finalQuery;
+    
+    if (segment.logicType === 'OR' && Object.keys(segmentConditions).length > 0) {
+      // For OR logic, we need a more complex query structure:
+      // We use $and to combine the userId requirement with the $or of segment conditions
+      finalQuery = {
+        $and: [
+          userFilter, // Always enforce user isolation as the first condition
+          { $or: Object.entries(segmentConditions).map(([key, value]) => ({ [key]: value })) }
+        ]
+      };
+    } else {
+      // For AND logic, we can simply combine all conditions with userId
+      finalQuery = {
+        ...userFilter,        // First ensure user isolation
+        ...segmentConditions  // Then add segment conditions 
+      };
+    }
+    
+    console.log(`Campaign audience query for user ${req.user._id}:`, JSON.stringify(finalQuery, null, 2));
+    const matchedCustomers = await Customer.find(finalQuery);
     console.log(`Found ${matchedCustomers.length} customers matching segment criteria`);
 
-    // Create the campaign with audience size information
+    // Create the campaign with audience size information and userId for tenant isolation
     const campaign = await Campaign.create({
       name,
       segmentId,
+      userId: req.user._id,  // Add user ID for tenant isolation
       audienceSize: matchedCustomers.length,
       deliveryStats: {
         sent: 0,
@@ -308,8 +343,8 @@ const getCampaigns = async (req, res) => {
   try {
     console.log('Fetching all campaigns with segment information');
     
-    // Find all campaigns and sort by most recent first
-    const campaigns = await Campaign.find()
+    // Find all campaigns belonging to the current user and sort by most recent first
+    const campaigns = await Campaign.find({ userId: req.user._id })
       .sort({ launchedAt: -1 })
       .populate('segmentId', 'name conditions');
       
@@ -375,9 +410,11 @@ const getCampaignDetails = async (req, res) => {
       return res.status(400).json({ message: 'Invalid campaign ID format' });
     }
     
-    // Fetch campaign with populated segment data
-    const campaign = await Campaign.findById(req.params.id)
-      .populate('segmentId', 'name conditions logicType');
+    // Fetch campaign with populated segment data, restricted to the current user
+    const campaign = await Campaign.findOne({
+      _id: req.params.id,
+      userId: req.user._id  // Filter by the authenticated user ID for tenant isolation
+    }).populate('segmentId', 'name conditions logicType');
     
     if (!campaign) {
       console.error(`Campaign not found with ID: ${req.params.id}`);
@@ -535,8 +572,6 @@ const getCampaignDetails = async (req, res) => {
 // Delete a campaign
 const deleteCampaign = async (req, res) => {
   try {
-    console.log(`Attempting to delete campaign ${req.params.id}`);
-    
     // Validate the campaign ID
     if (!req.params.id || req.params.id === 'undefined') {
       console.error('Invalid campaign ID provided:', req.params.id);
@@ -549,10 +584,14 @@ const deleteCampaign = async (req, res) => {
       return res.status(400).json({ message: 'Invalid campaign ID format' });
     }
     
-    // Check if campaign exists first
-    const campaign = await Campaign.findById(req.params.id);
+    // Check if campaign exists and belongs to the current user
+    const campaign = await Campaign.findOne({
+      _id: req.params.id,
+      userId: req.user._id  // Filter by the authenticated user ID for tenant isolation
+    });
+    
     if (!campaign) {
-      return res.status(404).json({ message: 'Campaign not found' });
+      return res.status(404).json({ message: 'Campaign not found or you do not have access to it' });
     }
     
     // Delete all delivery logs associated with this campaign first

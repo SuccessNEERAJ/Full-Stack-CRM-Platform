@@ -4,8 +4,14 @@ import Customer from '../models/Customer.js';
 
 const createSegment = async (req, res) => {
   try {
+    // Add the authenticated user ID to the segment data
+    const segmentData = {
+      ...req.body,
+      userId: req.user._id // req.user is set by the authentication middleware
+    };
+    
     // Create segment with stronger write concern
-    const segment = await Segment.create(req.body);
+    const segment = await Segment.create(segmentData);
     
     // Verify the segment was created by reading it back
     const verifiedSegment = await Segment.findById(segment._id);
@@ -23,7 +29,11 @@ const createSegment = async (req, res) => {
 
 const previewAudience = async (req, res) => {
   try {
-    const segment = await Segment.findById(req.params.id);
+    // Only fetch segments that belong to the authenticated user
+    const segment = await Segment.findOne({ 
+      _id: req.params.id,
+      userId: req.user._id
+    });
 
     if (!segment) {
       return res.status(404).json({ message: "Segment not found" });
@@ -31,16 +41,45 @@ const previewAudience = async (req, res) => {
 
     // Make sure we have valid conditions
     if (!segment.conditions || Object.keys(segment.conditions).length === 0) {
-      // If no conditions, return all customers (up to a limit)
-      const allCustomers = await Customer.find().limit(100);
+      // If no conditions, return all customers for this user (up to a limit)
+      const allCustomers = await Customer.find({ userId: req.user._id }).limit(100);
       return res.status(200).json({
         count: allCustomers.length,
         customers: allCustomers
       });
     }
 
-    // Find customers matching the segment conditions
-    const matchedCustomers = await Customer.find(segment.conditions);
+    // IMPORTANT: Always enforce user isolation first and foremost
+    // This ensures that no matter what other conditions are applied,
+    // we ONLY ever get customers belonging to the current user
+    const userFilter = { userId: req.user._id };
+    
+    // Segment conditions from the database
+    const segmentConditions = segment.conditions || {};
+    
+    // Construct a MongoDB query that properly respects both tenant isolation
+    // and the segment's conditions and logic type
+    let finalQuery;
+    
+    if (segment.logicType === 'OR' && Object.keys(segmentConditions).length > 0) {
+      // For OR logic, we need a more complex query structure:
+      // We use $and to combine the userId requirement with the $or of segment conditions
+      finalQuery = {
+        $and: [
+          userFilter, // Always enforce user isolation as the first condition
+          { $or: Object.entries(segmentConditions).map(([key, value]) => ({ [key]: value })) }
+        ]
+      };
+    } else {
+      // For AND logic, we can simply combine all conditions with userId
+      finalQuery = {
+        ...userFilter,        // First ensure user isolation
+        ...segmentConditions  // Then add segment conditions 
+      };
+    }
+    
+    console.log(`Segment preview query for user ${req.user._id}:`, JSON.stringify(finalQuery, null, 2));
+    const matchedCustomers = await Customer.find(finalQuery);
     
     console.log(`Found ${matchedCustomers.length} customers for segment ${req.params.id}`);
 
@@ -56,8 +95,9 @@ const previewAudience = async (req, res) => {
 
 // Get all segments
 const getSegments = async (req, res) => {
+  // Only fetch segments belonging to the authenticated user
   try {
-    const segments = await Segment.find().sort({ createdAt: -1 });
+    const segments = await Segment.find({ userId: req.user._id }).sort({ createdAt: -1 });
     
     // Ensure dates are properly formatted
     const formattedSegments = segments.map(segment => {
@@ -93,7 +133,10 @@ const getSegments = async (req, res) => {
 // Get segment by ID
 const getSegmentById = async (req, res) => {
   try {
-    const segment = await Segment.findById(req.params.id);
+    const segment = await Segment.findOne({
+      _id: req.params.id,
+      userId: req.user._id
+    });
     
     if (!segment) {
       return res.status(404).json({ message: 'Segment not found' });
@@ -111,8 +154,8 @@ const updateSegment = async (req, res) => {
   try {
     console.log('Updating segment:', req.params.id, req.body);
     
-    const updatedSegment = await Segment.findByIdAndUpdate(
-      req.params.id,
+    const updatedSegment = await Segment.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
       req.body,
       { new: true, runValidators: true }
     );

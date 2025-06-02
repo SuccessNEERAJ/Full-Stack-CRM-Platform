@@ -2,6 +2,12 @@
 import mongoose from 'mongoose';
 
 const segmentSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true // Add index for query performance
+  },
   name: {
     type: String,
     required: true

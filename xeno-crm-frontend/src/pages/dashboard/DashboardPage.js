@@ -75,7 +75,14 @@ const DashboardPage = () => {
       campaigns: 0
     },
     // For notifications
-    recentActivities: []
+    recentActivities: [],
+    // AI insights from Groq API
+    aiInsights: {
+      customerTrends: null,
+      segmentRecommendations: null,
+      campaignSuggestions: null,
+      loaded: false
+    }
   });
   
   // Growth data will be calculated based on real data
@@ -97,6 +104,8 @@ const DashboardPage = () => {
         // Check if we have a token in the URL (for initial login)
         const params = new URLSearchParams(location.search);
         const tokenFromUrl = params.get('token');
+        // Get token from localStorage if not in URL
+        const storedToken = localStorage.getItem('xeno_auth_token');
         const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
         
         // Prepare headers
@@ -107,42 +116,73 @@ const DashboardPage = () => {
           'Expires': '0'
         };
         
-        // Add Authorization header if token is available
+        // Add Authorization header from any available token source
+        // Priority: URL token > localStorage token
         if (tokenFromUrl && params.get('auth') === 'success') {
           console.log('Using token from URL for initial data fetch');
           headers['Authorization'] = `Bearer ${tokenFromUrl}`;
-          console.log('Headers for data fetch:', JSON.stringify(headers));
+          // Also save the token to localStorage for future use
+          localStorage.setItem('xeno_auth_token', tokenFromUrl);
+        } else if (storedToken) {
+          console.log('Using stored token for data fetch');
+          headers['Authorization'] = `Bearer ${storedToken}`;
         } else {
-          console.log('No token available for data fetch');
+          console.log('No token available for data fetch - this may cause authentication issues');
         }
         
-        // Use fetch API instead of axios
-        let customersRes, segmentsRes, campaignsRes, historicalDataRes;
+        console.log('Dashboard data fetch - Headers:', JSON.stringify(headers));
+        
+        // Use fetch API with proper error handling
+        let customersRes, segmentsRes, campaignsRes, historicalDataRes, aiInsightsRes;
         
         try {
-          // Fetch customers
+          // Fetch customers with improved error handling
           const customersResponse = await fetch(`${apiUrl}/api/customers?_t=${timestamp}`, {
             method: 'GET',
             headers: headers,
             credentials: 'include'
           });
-          customersRes = { data: await customersResponse.json() };
           
-          // Fetch segments
+          if (!customersResponse.ok) {
+            console.error('Customers API error:', customersResponse.status, customersResponse.statusText);
+            throw new Error(`Customers API returned ${customersResponse.status}`);
+          }
+          
+          const customersData = await customersResponse.json();
+          console.log('Customers data received:', customersData.length || 0, 'customers');
+          customersRes = { data: customersData };
+          
+          // Fetch segments with improved error handling
           const segmentsResponse = await fetch(`${apiUrl}/api/segments?_t=${timestamp}`, {
             method: 'GET',
             headers: headers,
             credentials: 'include'
           });
-          segmentsRes = { data: await segmentsResponse.json() };
           
-          // Fetch campaigns
+          if (!segmentsResponse.ok) {
+            console.error('Segments API error:', segmentsResponse.status, segmentsResponse.statusText);
+            throw new Error(`Segments API returned ${segmentsResponse.status}`);
+          }
+          
+          const segmentsData = await segmentsResponse.json();
+          console.log('Segments data received:', segmentsData.length || 0, 'segments');
+          segmentsRes = { data: segmentsData };
+          
+          // Fetch campaigns with improved error handling
           const campaignsResponse = await fetch(`${apiUrl}/api/campaigns?_t=${timestamp}`, {
             method: 'GET',
             headers: headers,
             credentials: 'include'
           });
-          campaignsRes = { data: await campaignsResponse.json() };
+          
+          if (!campaignsResponse.ok) {
+            console.error('Campaigns API error:', campaignsResponse.status, campaignsResponse.statusText);
+            throw new Error(`Campaigns API returned ${campaignsResponse.status}`);
+          }
+          
+          const campaignsData = await campaignsResponse.json();
+          console.log('Campaigns data received:', campaignsData.length || 0, 'campaigns');
+          campaignsRes = { data: campaignsData };
           
           // Fetch historical data (might not exist)
           try {
@@ -151,12 +191,44 @@ const DashboardPage = () => {
               headers: headers,
               credentials: 'include'
             });
-            historicalDataRes = { data: await historicalResponse.json() };
+            
+            if (historicalResponse.ok) {
+              historicalDataRes = { data: await historicalResponse.json() };
+            } else {
+              console.log('Historical data API returned status:', historicalResponse.status);
+              historicalDataRes = { data: null };
+            }
           } catch (error) {
+            console.log('Historical data not available:', error.message);
             historicalDataRes = { data: null };
+          }
+          
+          // Fetch AI insights using Groq API integration
+          try {
+            const aiInsightsResponse = await fetch(`${apiUrl}/api/ai/insights?_t=${timestamp}`, {
+              method: 'GET',
+              headers: headers,
+              credentials: 'include'
+            });
+            
+            if (aiInsightsResponse.ok) {
+              aiInsightsRes = { data: await aiInsightsResponse.json() };
+              console.log('AI insights data received');
+            } else {
+              console.error('AI insights API error:', aiInsightsResponse.status);
+              aiInsightsRes = { data: null };
+            }
+          } catch (error) {
+            console.log('AI insights not available:', error.message);
+            aiInsightsRes = { data: null };
           }
         } catch (error) {
           console.error('Error fetching dashboard data:', error);
+          setNotification({
+            open: true,
+            message: `Error fetching dashboard data: ${error.message}`,
+            severity: 'error'
+          });
           throw error;
         }
         
@@ -308,6 +380,32 @@ const DashboardPage = () => {
         // Sort all activities by date
         recentActivities.sort((a, b) => new Date(b.date) - new Date(a.date));
         
+        // Process AI insights if available
+        let processedAiInsights = {
+          customerTrends: null,
+          segmentRecommendations: null,
+          campaignSuggestions: null,
+          loaded: false
+        };
+        
+        if (aiInsightsRes?.data) {
+          const insights = aiInsightsRes.data;
+          console.log('Processing AI insights from Groq API');
+          
+          processedAiInsights = {
+            customerTrends: insights.customerTrends || null,
+            segmentRecommendations: insights.segmentRecommendations || null,
+            campaignSuggestions: insights.campaignSuggestions || null,
+            // Any additional insights from Groq
+            growthPredictions: insights.growthPredictions || null,
+            loaded: true
+          };
+          
+          console.log('AI insights loaded successfully');
+        } else {
+          console.log('No AI insights available');
+        }
+        
         // Set state with all the calculated data
         setStats({
           totalCustomers: customers.length,
@@ -324,11 +422,23 @@ const DashboardPage = () => {
             totalAudience
           },
           previousPeriod,
-          recentActivities: recentActivities.slice(0, 10) // Keep only the 10 most recent activities
+          recentActivities: recentActivities.slice(0, 10), // Keep only the 10 most recent activities
+          aiInsights: processedAiInsights
         });
         
         // Set growth data separately
         setGrowthData(growth);
+        
+        if (customers.length === 0 && segments.length === 0 && campaigns.length === 0) {
+          console.log('Warning: No data retrieved from API endpoints. User might need to add initial data.');
+          
+          // Show notification to user if no data is available
+          setNotification({
+            open: true,
+            message: 'No customer, segment, or campaign data found. Create your first entries to populate the dashboard.',
+            severity: 'info'
+          });
+        }
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
       } finally {

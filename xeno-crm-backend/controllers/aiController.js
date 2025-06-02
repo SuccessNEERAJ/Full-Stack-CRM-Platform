@@ -372,8 +372,175 @@ const generateCampaignSummary = async (req, res) => {
   }
 };
 
+/**
+ * Get AI-powered insights for the dashboard
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+const getDashboardInsights = async (req, res) => {
+  try {
+    console.log('Generating dashboard insights from real-time data');
+    
+    // Fetch actual data from the database for generating insights
+    // Filter by the current user's ID for tenant isolation
+    const userId = req.user._id;
+    console.log(`Generating insights for user ID: ${userId}`);
+    
+    const customers = await Customer.find({ userId }).sort({ createdAt: -1 }).limit(100);
+    const segments = await Segment.find({ userId }).sort({ createdAt: -1 }).limit(20);
+    const campaigns = await Campaign.find({ userId }).sort({ createdAt: -1 }).limit(10);
+    
+    console.log(`Found ${customers.length} customers, ${segments.length} segments, ${campaigns.length} campaigns`);
+    
+    // If there's no data at all, return empty insights
+    if (customers.length === 0 && segments.length === 0 && campaigns.length === 0) {
+      return res.status(200).json({
+        customerTrends: null,
+        segmentRecommendations: null,
+        campaignSuggestions: null,
+        message: "Not enough data to generate insights. Add customers, segments, and campaigns to see AI insights."
+      });
+    }
+    
+    // Prepare data summaries to feed into the AI
+    const customerSummary = customers.length > 0 ? {
+      count: customers.length,
+      averageSpend: customers.reduce((sum, c) => sum + (c.totalSpend || 0), 0) / customers.length,
+      topCustomers: customers
+        .sort((a, b) => (b.totalSpend || 0) - (a.totalSpend || 0))
+        .slice(0, 5)
+        .map(c => ({ name: `${c.firstName} ${c.lastName}`, spend: c.totalSpend || 0 }))
+    } : null;
+    
+    const segmentSummary = segments.length > 0 ? {
+      count: segments.length,
+      types: segments.map(s => ({ name: s.name, conditions: s.conditions }))
+    } : null;
+    
+    const campaignSummary = campaigns.length > 0 ? {
+      count: campaigns.length,
+      recent: campaigns.slice(0, 5).map(c => ({
+        name: c.name, 
+        audience: c.audienceSize || 0,
+        deliveryStats: c.deliveryStats || { sent: 0, delivered: 0 }
+      }))
+    } : null;
+    
+    // Generate insights based on available data
+    let insights = {
+      customerTrends: null,
+      segmentRecommendations: null,
+      campaignSuggestions: null,
+      timestamp: new Date().toISOString()
+    };
+    
+    // If we have customer data, generate customer trends
+    if (customerSummary) {
+      // Create a prompt for the Groq API to analyze customer data
+      const customerPrompt = `
+        Analyze this customer data and provide insights:
+        ${JSON.stringify(customerSummary)}
+        
+        Provide 3-4 specific, actionable insights about customer trends based on this data.
+        Format the response as a JSON array of strings, each containing one insight.
+        Be specific, data-driven, and business-oriented in your insights.
+      `;
+      
+      try {
+        const customerInsightsText = await askGroq('customerTrends', customerPrompt, { temperature: 0.4 });
+        const cleanedCustomerInsights = customerInsightsText.replace(/```json|```javascript|```js|```/g, '').trim();
+        
+        try {
+          insights.customerTrends = JSON.parse(cleanedCustomerInsights);
+        } catch (parseError) {
+          console.error("Failed to parse customer insights as JSON:", cleanedCustomerInsights);
+          insights.customerTrends = [cleanedCustomerInsights];
+        }
+      } catch (error) {
+        console.error('Error generating customer trends:', error);
+      }
+    }
+    
+    // If we have segment data, generate segment recommendations
+    if (segmentSummary) {
+      // Create a prompt for the Groq API to analyze segment data
+      const segmentPrompt = `
+        Based on these customer segments:
+        ${JSON.stringify(segmentSummary)}
+        
+        Recommend 2-3 new customer segments that might be valuable for targeted marketing.
+        For each recommendation, include:
+        - A name for the segment
+        - A brief description of the customer characteristics
+        - The business value of targeting this segment
+        
+        Format the response as a JSON array of objects with keys: name, description, businessValue.
+      `;
+      
+      try {
+        const segmentInsightsText = await askGroq('segmentRecommendations', segmentPrompt, { temperature: 0.5 });
+        const cleanedSegmentInsights = segmentInsightsText.replace(/```json|```javascript|```js|```/g, '').trim();
+        
+        try {
+          insights.segmentRecommendations = JSON.parse(cleanedSegmentInsights);
+        } catch (parseError) {
+          console.error("Failed to parse segment recommendations as JSON:", cleanedSegmentInsights);
+          insights.segmentRecommendations = [{ name: "Custom Segment", description: cleanedSegmentInsights }];
+        }
+      } catch (error) {
+        console.error('Error generating segment recommendations:', error);
+      }
+    }
+    
+    // If we have campaign data, generate campaign suggestions
+    if (campaignSummary) {
+      // Create a prompt for the Groq API to generate campaign suggestions
+      const campaignPrompt = `
+        Based on these previous campaigns:
+        ${JSON.stringify(campaignSummary)}
+        
+        Suggest 2-3 new marketing campaign ideas that could drive business growth.
+        For each suggestion, include:
+        - A catchy campaign name
+        - The campaign objective
+        - Target audience characteristics
+        - Expected outcome
+        
+        Format the response as a JSON array of objects with keys: name, objective, audience, expectedOutcome.
+      `;
+      
+      try {
+        const campaignSuggestionsText = await askGroq('campaignSuggestions', campaignPrompt, { temperature: 0.6 });
+        const cleanedCampaignSuggestions = campaignSuggestionsText.replace(/```json|```javascript|```js|```/g, '').trim();
+        
+        try {
+          insights.campaignSuggestions = JSON.parse(cleanedCampaignSuggestions);
+        } catch (parseError) {
+          console.error("Failed to parse campaign suggestions as JSON:", cleanedCampaignSuggestions);
+          insights.campaignSuggestions = [{ name: "Growth Campaign", objective: cleanedCampaignSuggestions }];
+        }
+      } catch (error) {
+        console.error('Error generating campaign suggestions:', error);
+      }
+    }
+    
+    console.log('Successfully generated dashboard insights');
+    res.status(200).json(insights);
+    
+  } catch (error) {
+    console.error('Error generating dashboard insights:', error);
+    res.status(500).json({ 
+      message: error.message,
+      customerTrends: null,
+      segmentRecommendations: null,
+      campaignSuggestions: null
+    });
+  }
+};
+
 export {
   naturalLanguageToSegment,
   generateMessageSuggestions,
-  generateCampaignSummary
+  generateCampaignSummary,
+  getDashboardInsights
 };

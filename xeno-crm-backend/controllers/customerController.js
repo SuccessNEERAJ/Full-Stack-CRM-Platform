@@ -9,8 +9,14 @@ const addCustomer = async (req, res) => {
       return res.status(400).json({ message: 'First name, last name, and email are required' });
     }
     
+    // Add the authenticated user's ID to the customer data
+    const customerData = {
+      ...req.body,
+      userId: req.user._id // req.user is set by the authentication middleware
+    };
+    
     // Create with stronger write concern
-    const newCustomer = await Customer.create(req.body);
+    const newCustomer = await Customer.create(customerData);
     
     // Verify the customer was created by reading it back
     const verifiedCustomer = await Customer.findById(newCustomer._id);
@@ -30,7 +36,8 @@ const addCustomer = async (req, res) => {
 // Get all customers
 const getCustomers = async (req, res) => {
   try {
-    const customers = await Customer.find().sort({ createdAt: -1 });
+    // Only fetch customers belonging to the authenticated user
+    const customers = await Customer.find({ userId: req.user._id }).sort({ createdAt: -1 });
     
     // Ensure totalSpend is properly formatted for each customer
     const formattedCustomers = customers.map(customer => {
@@ -59,7 +66,11 @@ const getCustomers = async (req, res) => {
 // Get customer by ID
 const getCustomerById = async (req, res) => {
   try {
-    const customer = await Customer.findById(req.params.id);
+    // Only fetch the customer if it belongs to the authenticated user
+    const customer = await Customer.findOne({
+      _id: req.params.id,
+      userId: req.user._id
+    });
     
     if (!customer) {
       return res.status(404).json({ message: 'Customer not found' });
@@ -75,9 +86,10 @@ const getCustomerById = async (req, res) => {
 // Update customer
 const updateCustomer = async (req, res) => {
   try {
-    const updatedCustomer = await Customer.findByIdAndUpdate(
-      req.params.id, 
-      req.body, 
+    // Only update the customer if it belongs to the authenticated user
+    const updatedCustomer = await Customer.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
+      req.body,
       { new: true, runValidators: true }
     );
     
@@ -95,8 +107,11 @@ const updateCustomer = async (req, res) => {
 // Delete customer
 const deleteCustomer = async (req, res) => {
   try {
-    // Find the customer to verify it exists
-    const customer = await Customer.findById(req.params.id);
+    // First find the customer that belongs to the authenticated user
+    const customer = await Customer.findOne({ 
+      _id: req.params.id, 
+      userId: req.user._id 
+    });
     
     if (!customer) {
       return res.status(404).json({ message: 'Customer not found' });

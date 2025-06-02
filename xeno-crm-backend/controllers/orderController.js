@@ -9,8 +9,9 @@ const addOrder = async (req, res) => {
       return res.status(400).json({ message: 'Customer ID is required' });
     }
     
-    // Create the order data object
+    // Create the order data object with userId for tenant isolation
     const orderData = {
+      userId: req.user._id,  // Add user ID for tenant isolation
       customerId: req.body.customerId,
       status: req.body.status || 'Pending',
       items: req.body.items || [],
@@ -69,11 +70,13 @@ const getOrders = async (req, res) => {
   try {
     console.log('Fetching all orders with customer data');
     
-    // Use populate to include customer data
-    const orders = await Order.find()
+    // Use populate to include customer data, filtering by the current user's ID for tenant isolation
+    const orders = await Order.find({ userId: req.user._id })
       .sort({ createdAt: -1 })
       .populate('customerId', 'firstName lastName email')
       .lean();
+      
+    console.log(`Fetching orders for user: ${req.user._id}`);
     
     // Format orders to include customer name
     const formattedOrders = orders.map(order => {
@@ -102,7 +105,11 @@ const getOrders = async (req, res) => {
 // Get order by ID
 const getOrderById = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id)
+    // Find order by ID and user ID for tenant isolation
+    const order = await Order.findOne({
+      _id: req.params.id,
+      userId: req.user._id  // Filter by the authenticated user's ID
+    })
       .populate('customerId', 'firstName lastName email phone address')
       .lean();
     
@@ -133,9 +140,25 @@ const getOrderById = async (req, res) => {
 // Update order
 const updateOrder = async (req, res) => {
   try {
+    // First check if the order exists and belongs to this user
+    const existingOrder = await Order.findOne({
+      _id: req.params.id,
+      userId: req.user._id  // Filter by the authenticated user's ID
+    });
+    
+    if (!existingOrder) {
+      return res.status(404).json({ message: 'Order not found or you do not have access to it' });
+    }
+    
+    // Keep the userId in the update to prevent changing ownership
+    const updateData = {
+      ...req.body,
+      userId: req.user._id  // Maintain the userId to prevent ownership change
+    };
+    
     const updatedOrder = await Order.findByIdAndUpdate(
       req.params.id, 
-      req.body, 
+      updateData, 
       { new: true, runValidators: true }
     ).populate('customerId', 'firstName lastName email')
     .lean();
@@ -166,13 +189,17 @@ const updateOrder = async (req, res) => {
 const deleteOrder = async (req, res) => {
   try {
     // First find the order to get customer ID and amount for updating total spend
-    const order = await Order.findById(req.params.id);
+    // Add userId filter for tenant isolation
+    const order = await Order.findOne({
+      _id: req.params.id,
+      userId: req.user._id  // Filter by the authenticated user's ID
+    });
     
     if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
+      return res.status(404).json({ message: 'Order not found or you do not have access to it' });
     }
     
-    // Delete the order
+    // Delete the order - already verified it belongs to this user
     await Order.findByIdAndDelete(req.params.id);
     
     // Update customer's total spend if the order had an amount
