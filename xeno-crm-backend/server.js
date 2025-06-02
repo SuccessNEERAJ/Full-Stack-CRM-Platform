@@ -175,8 +175,8 @@ const sessionOptions = {
     path: '/', // Available on all paths
     httpOnly: true, // Prevent client-side JS from reading cookie
     // These are critical for cross-domain cookies:
-    secure: true, // Always use secure cookies
-    sameSite: 'none' // Always use 'none' for cross-origin cookies
+    secure: process.env.NODE_ENV === 'production', // Only use secure in production
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' // Adjust based on environment
   }
 };
 

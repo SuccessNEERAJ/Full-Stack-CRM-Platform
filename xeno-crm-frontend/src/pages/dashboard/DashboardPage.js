@@ -478,10 +478,46 @@ const DashboardPage = () => {
     setNotification(prev => ({ ...prev, open: false }));
   };
 
+  // Show loading state
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-        <CircularProgress />
+      <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <CircularProgress sx={{ mb: 2 }} />
+        <Typography variant="body1">Loading dashboard data...</Typography>
+      </Box>
+    );
+  }
+  
+  // Fallback content if stats are missing
+  const hasData = stats && 
+    (stats.totalCustomers !== undefined || 
+     stats.totalSegments !== undefined || 
+     stats.totalCampaigns !== undefined);
+     
+  if (!hasData) {
+    console.error('Dashboard data is missing or incomplete:', stats);
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography variant="h5" color="error" gutterBottom>
+          Dashboard Data Issue
+        </Typography>
+        <Typography variant="body1" paragraph>
+          We're having trouble loading your dashboard data. This might be due to authentication issues or server connectivity problems.
+        </Typography>
+        <Button 
+          variant="contained" 
+          color="primary"
+          onClick={() => window.location.reload()}
+          sx={{ mr: 2 }}
+        >
+          Reload Page
+        </Button>
+        <Button 
+          variant="outlined"
+          onClick={() => navigate('/login')}
+        >
+          Return to Login
+        </Button>
       </Box>
     );
   }

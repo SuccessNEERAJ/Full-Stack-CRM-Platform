@@ -14,6 +14,7 @@ import MainLayout from './components/layouts/MainLayout';
 
 // Auth Pages
 import LoginPage from './pages/auth/LoginPage';
+import LoginCallback from './pages/auth/LoginCallback';
 
 // Dashboard and Main Pages
 import DashboardPage from './pages/dashboard/DashboardPage';
@@ -65,22 +66,107 @@ const ProtectedRoute = ({ children }) => {
 function App() {
   // Extract token from URL if present
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
+    // Function to extract token from URL
+    const extractAndStoreToken = () => {
+      // Check if we're on the dashboard page with auth parameters
+      const isDashboardWithAuth = window.location.pathname.includes('/dashboard') && 
+                                window.location.search.includes('auth=success');
+      
+      // Log the current URL and path for debugging
+      console.log('Current location:', {
+        pathname: window.location.pathname,
+        search: window.location.search,
+        isDashboardWithAuth: isDashboardWithAuth,
+        fullUrl: window.location.href
+      });
+      
+      // Get the current URL search params
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('token');
+      const authSuccess = urlParams.get('auth') === 'success';
+      
+      console.log('URL params check:', { 
+        hasToken: !!token, 
+        tokenLength: token ? token.length : 0,
+        authSuccess,
+        rawSearch: window.location.search
+      });
+      
+      // Special handling for OAuth redirect
+      if (isDashboardWithAuth) {
+        console.log('Detected dashboard with auth=success');
+        
+        // Extract token using regex as fallback if URLSearchParams fails
+        let extractedToken = token;
+        if (!extractedToken) {
+          const tokenMatch = window.location.search.match(/[?&]token=([^&]+)/);
+          if (tokenMatch && tokenMatch[1]) {
+            extractedToken = decodeURIComponent(tokenMatch[1]);
+            console.log('Extracted token using regex:', extractedToken.substring(0, 15) + '...');
+          }
+        }
+        
+        if (extractedToken) {
+          console.log('Token found in URL, storing in localStorage');
+          
+          try {
+            // Store the token
+            localStorage.setItem('xeno_auth_token', extractedToken);
+            console.log('Token stored in localStorage, length:', extractedToken.length);
+            
+            // Update API headers
+            updateAuthHeader();
+            console.log('API headers updated with token');
+            
+            // Clean up URL by removing all auth parameters
+            let newSearch = window.location.search;
+            newSearch = newSearch.replace(/[?&]token=[^&]+/g, '');
+            newSearch = newSearch.replace(/[?&]auth=[^&]+/g, '');
+            newSearch = newSearch.replace(/[?&]t=[^&]+/g, '');
+            newSearch = newSearch.replace(/[?&]user=[^&]+/g, '');
+            
+            // Fix the search string format
+            if (newSearch.startsWith('&')) {
+              newSearch = '?' + newSearch.substring(1);
+            }
+            
+            if (newSearch === '?') {
+              newSearch = '';
+            }
+            
+            // Create and apply the new clean URL
+            const newUrl = window.location.pathname + newSearch + window.location.hash;
+            console.log('Cleaned URL:', newUrl);
+            window.history.replaceState({}, document.title, newUrl);
+            
+            // Force a page refresh to ensure the token is used
+            window.location.reload();
+            return true;
+          } catch (error) {
+            console.error('Error storing token:', error);
+            return false;
+          }
+        } else {
+          console.log('Auth success but no token found in URL');
+        }
+      } else {
+        console.log('Not on dashboard with auth parameters');
+      }
+      
+      return false;
+    };
     
-    if (token) {
-      console.log('Token found in URL, storing in localStorage');
-      setAuthToken(token);
-      updateAuthHeader();
-      
-      // Clean up URL by removing the token parameter
-      const newUrl = window.location.pathname + 
-        window.location.search.replace(/[&?]token=[^&]+/, '') + 
-        window.location.hash;
-      
-      window.history.replaceState({}, document.title, newUrl);
-    } else {
-      console.log('No token found in URL');
+    // Execute the token extraction
+    const tokenExtracted = extractAndStoreToken();
+    
+    if (!tokenExtracted) {
+      console.log('No token extracted from URL');
+      // Check if we already have a token in localStorage
+      const existingToken = localStorage.getItem('xeno_auth_token');
+      if (existingToken) {
+        console.log('Found existing token in localStorage');
+        updateAuthHeader();
+      }
     }
   }, []);
   
@@ -103,6 +189,7 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/auth/callback" element={<LoginCallback />} />
           
           {/* Protected Routes within Main Layout */}
           <Route 

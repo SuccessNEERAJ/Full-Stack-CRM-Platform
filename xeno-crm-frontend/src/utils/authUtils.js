@@ -20,7 +20,7 @@ export const setAuthToken = (token) => {
     // Verify it was stored correctly
     const storedToken = localStorage.getItem('xeno_auth_token');
     const success = !!storedToken && storedToken === tokenString;
-    console.log(`Token storage ${success ? 'successful' : 'failed'}`);
+    console.log(`Token storage ${success ? 'successful' : 'failed'}. Token value: ${storedToken ? storedToken.substring(0, 20) + '...' : 'null'}`);
     
     return success;
   } catch (error) {
@@ -33,11 +33,17 @@ export const setAuthToken = (token) => {
 export const getAuthToken = () => {
   try {
     const token = localStorage.getItem('xeno_auth_token');
-    if (!token) {
+    if (token) {
+      console.log(`Token retrieved from localStorage (length: ${token.length})`);
+      // Validate token format (simple check)
+      if (token.split('.').length !== 3) {
+        console.warn('Retrieved token does not appear to be valid JWT format');
+      }
+      return token;
+    } else {
       console.log('No token found in localStorage');
       return null;
     }
-    return token;
   } catch (error) {
     console.error('Error retrieving auth token:', error);
     return null;

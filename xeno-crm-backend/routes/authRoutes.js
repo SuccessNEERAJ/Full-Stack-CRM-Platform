@@ -57,9 +57,9 @@ router.get(
       // Ensure we don't have double slashes in the URL
       const baseUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
       
-      // Add JWT token to the redirect URL
-      const redirectUrl = `${baseUrl}/dashboard?auth=success&token=${encodeURIComponent(token)}&t=${Date.now()}&user=${encodeURIComponent(req.user?.email || 'unknown')}`;
-      console.log('Redirecting to:', redirectUrl);
+      // Add JWT token to the redirect URL - use dedicated callback route
+      const redirectUrl = `${baseUrl}/auth/callback?auth=success&token=${encodeURIComponent(token)}&t=${Date.now()}&user=${encodeURIComponent(req.user?.email || 'unknown')}`;
+      console.log('Redirecting to callback route:', redirectUrl);
       
       // Redirect to frontend with JWT token
       res.redirect(redirectUrl);
@@ -72,7 +72,7 @@ router.get(
 // @route   GET /api/auth/current_user
 // @desc    Get current user
 // @access  Private
-router.get('/current_user', (req, res) => {
+router.get('/current_user', async (req, res) => {
   // Debug headers and session info
   console.log('Current user request headers:', {
     origin: req.headers.origin,
@@ -81,18 +81,19 @@ router.get('/current_user', (req, res) => {
     cookie: req.headers.cookie ? 'Present' : 'Absent'
   });
   
-  // Log all headers for debugging
-  console.log('All request headers:', JSON.stringify(req.headers));
-  
-  // Set explicit CORS headers to ensure the cookies can be sent/received
-  res.header('Access-Control-Allow-Origin', req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:3000');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   
   // Set cache control headers to prevent caching
   res.header('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.header('Pragma', 'no-cache');
   res.header('Expires', '0');
+  
+  // Log request details for debugging
+  console.log('Current user request headers:', {
+    origin: req.headers.origin,
+    referer: req.headers.referer,
+    authorization: req.headers.authorization ? 'Present' : 'Absent',
+    cookie: req.headers.cookie ? 'Present' : 'Absent'
+  });
   
   // Check for JWT token in Authorization header
   const authHeader = req.headers.authorization;
@@ -100,14 +101,31 @@ router.get('/current_user', (req, res) => {
   
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split(' ')[1];
-    const { valid, decoded } = verifyToken(token);
+    console.log(`JWT token found (length: ${token.length})`);
+    const { valid, decoded, error } = verifyToken(token);
     
-    if (valid) {
-      console.log('Valid JWT token found for user:', decoded.email);
-      jwtUser = decoded;
+    if (valid && decoded) {
+      console.log('Valid JWT token found for user ID:', decoded.id);
+      
+      try {
+        // Find the user by ID from the token
+        const User = mongoose.model('User');
+        const user = await User.findById(decoded.id);
+        
+        if (user) {
+          console.log('User found in database from JWT:', user.email);
+          jwtUser = user;
+        } else {
+          console.log('User from JWT not found in database');
+        }
+      } catch (err) {
+        console.error('Error finding user from JWT:', err.message);
+      }
     } else {
-      console.log('Invalid JWT token');
+      console.log('Invalid JWT token:', error);
     }
+  } else {
+    console.log('Authorization header:', authHeader || 'Absent');
   }
   
   // First check if user is authenticated via session
@@ -135,19 +153,20 @@ router.get('/current_user', (req, res) => {
     return res.json({
       isAuthenticated: true,
       user: {
-        id: jwtUser.id,
+        id: jwtUser._id,
+        displayName: jwtUser.displayName,
         email: jwtUser.email,
-        displayName: jwtUser.displayName
+        profileImage: jwtUser.profileImage
       },
       authMethod: 'jwt',
       timestamp: new Date().toISOString()
     });
   } 
-  // No authentication
+  // User is not authenticated
   else {
-    console.log('No authentication found');
+    console.log('User is not authenticated');
     
-    return res.json({ 
+    return res.json({
       isAuthenticated: false,
       message: 'Not authenticated',
       timestamp: new Date().toISOString()

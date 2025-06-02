@@ -22,9 +22,12 @@ export const updateAuthHeader = () => {
   const token = getAuthToken();
   if (token) {
     apiService.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    console.log('Default Authorization header set globally');
+    console.log('Default Authorization header set globally:', `Bearer ${token.substring(0, 15)}...`);
+    return true;
   } else {
     delete apiService.defaults.headers.common['Authorization'];
+    console.log('Removed Authorization header - no token available');
+    return false;
   }
 };
 
@@ -34,24 +37,31 @@ updateAuthHeader();
 // Add a request interceptor to include JWT token
 apiService.interceptors.request.use(
   (config) => {
-    // Add JWT token to Authorization header if available
+    // Always check for fresh token on each request
     const token = getAuthToken();
     console.log('JWT token available:', token ? 'Yes (length: ' + token.length + ')' : 'No');
     
     if (token) {
-      // Explicitly set the Authorization header
-      config.headers = {
-        ...config.headers,
-        'Authorization': `Bearer ${token}`
-      };
-      console.log('Authorization header set:', `Bearer ${token.substring(0, 20)}...`);
+      config.headers['Authorization'] = `Bearer ${token}`;
+      console.log(`Adding Authorization header to ${config.url}: Bearer ${token.substring(0, 15)}...`);
+      
+      // Log all request headers for debugging
+      console.log('Request headers:', JSON.stringify(config.headers));
     } else {
-      console.warn('No JWT token found in localStorage');
+      console.log(`No token available for request to ${config.url}`);
+      // Try to get token directly from localStorage as a fallback
+      const fallbackToken = localStorage.getItem('xeno_auth_token');
+      if (fallbackToken) {
+        config.headers['Authorization'] = `Bearer ${fallbackToken}`;
+        console.log(`Using fallback token for ${config.url}: Bearer ${fallbackToken.substring(0, 15)}...`);
+      }
     }
+    
+    // Ensure content type is set
+    config.headers['Content-Type'] = 'application/json';
     
     // Log all requests for debugging
     console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
-    console.log('Headers being sent:', JSON.stringify(config.headers));
     
     return config;
   },
